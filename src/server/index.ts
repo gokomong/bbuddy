@@ -21,6 +21,9 @@ import { homedir } from "os";
 const BUDDY_STATUS_PATH = join(homedir(), ".claude", "buddy-status.json");
 const RESET = '\x1b[0m';
 
+// Note: when species was overridden at hatch time, bones (rarity, stats, eye, hat)
+// still come from the deterministic roll. Only species name comes from DB.
+// This is intentional — bones are tied to the userId hash, not the species.
 function loadCompanion(row: any, userIdOverride?: string): Companion | null {
   if (!row) return null;
   const userId = userIdOverride || row.user_id || 'anon';

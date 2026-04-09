@@ -47,7 +47,7 @@ try {
   } catch { /* no claude-hud installed */ }
 
   if (pluginDir) {
-    const bunPath = "/c/Users/steven.wu/.bun/bin/bun";
+    const bunPath = process.env.BUN_PATH || 'bun';
     const entryPoint = toUnix(join(pluginDir, "src", "index.ts"));
     const result = execSync(
       `"${bunPath}" --env-file /dev/null "${entryPoint}"`,
@@ -88,15 +88,16 @@ try {
       } else {
         ascii = buddy.ascii || "";
       }
+
+      // Apply eye substitution for SPECIES_ANIMATIONS path only.
+      // The SPRITE_BODIES path above handles {E} substitution inside renderSprite().
+      if (buddy.eye) {
+        ascii = ascii.replaceAll('{E}', buddy.eye);
+      }
     }
 
     if (ascii) {
       let asciiLines = ascii.split("\n");
-
-      // Apply eye substitution if eye is provided
-      if (buddy.eye) {
-        asciiLines = asciiLines.map((line: string) => line.replaceAll('{E}', buddy.eye));
-      }
 
       // Apply hat overlay on first line if hat is provided and line is blank
       if (buddy.hat && buddy.hat !== 'none' && asciiLines.length > 0 && !asciiLines[0].trim()) {
