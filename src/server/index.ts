@@ -7,17 +7,21 @@ import {
   ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { initDb, db } from "../db/schema.js";
-import { SPECIES, SPECIES_ART, generatePersonality, generateName, calculateMood, getStatusCard, determineBuddy, getReaction } from "../lib/species.js";
+import {
+  SPECIES, SPECIES_LIST, SPECIES_ART, SPECIES_ANIMATIONS,
+  generateName, calculateMood, getReaction,
+  renderSprite, renderFace, spriteFrameCount,
+} from "../lib/species.js";
+import { type Companion, STAT_NAMES, RARITY_STARS, RARITY_ANSI } from "../lib/types.js";
+import { roll, statBar } from "../lib/rng.js";
 import { writeFileSync, mkdirSync, unlinkSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 
 const BUDDY_STATUS_PATH = join(homedir(), ".claude", "buddy-status.json");
+const RESET = '\x1b[0m';
 
-function writeBuddyStatus(companion: any) {
-  if (!companion) return;
-  const art = SPECIES_ART[companion.species] || { egg: "", hatchling: "", adult: "" };
-  const stage = companion.level >= 10 ? "adult" : "hatchling";
+function writeBuddyStatus(companion: Companion) {
   try {
     mkdirSync(join(homedir(), ".claude"), { recursive: true });
     writeFileSync(BUDDY_STATUS_PATH, JSON.stringify({
@@ -27,8 +31,12 @@ function writeBuddyStatus(companion: any) {
       xp: companion.xp,
       mood: companion.mood,
       rarity: companion.rarity,
-      is_shiny: companion.is_shiny,
-      ascii: art[stage],
+      is_shiny: companion.shiny,
+      eye: companion.eye,
+      hat: companion.hat,
+      stats: companion.stats,
+      rarity_stars: RARITY_STARS[companion.rarity],
+      personality_bio: companion.personalityBio,
     }));
   } catch { /* non-fatal */ }
 }
@@ -62,8 +70,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           type: "object",
           properties: {
             name: { type: "string", description: "Optional name for your companion." },
-            species: { 
-              type: "string", 
+            species: {
+              type: "string",
               enum: Object.values(SPECIES),
               description: "The species of companion to hatch. If omitted, will be determined by user_id or RNG."
             },
@@ -119,83 +127,116 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
   if (name === "buddy_hatch") {
-    const { name: requestedName, species: requestedSpecies, user_id } = args as { name?: string, species?: string, user_id?: string };
-    
-    let species = requestedSpecies;
-    let rarity = 'Common';
-    let isShiny = 0;
+    const { name: requestedName, species: requestedSpecies, user_id } = args as {
+      name?: string; species?: string; user_id?: string;
+    };
 
-    if (!species) {
-      const result = determineBuddy(user_id || null);
-      species = result.species;
-      rarity = result.rarity;
-      isShiny = result.isShiny ? 1 : 0;
-    } else {
-      if (!Object.values(SPECIES).includes(species as any)) {
-        return {
-          content: [{ type: "text", text: `Unknown species: ${species}. Available: ${Object.values(SPECIES).join(", ")}` }],
-        };
-      }
-    }
+    const userId = user_id || 'anon-' + Math.random().toString(36).substring(7);
+    const { bones } = roll(userId, SPECIES_LIST);
 
-    const finalName = requestedName || generateName(species);
+    const finalSpecies = requestedSpecies && SPECIES_LIST.includes(requestedSpecies as any)
+      ? requestedSpecies
+      : bones.species;
+
+    const finalName = requestedName || generateName(finalSpecies);
     const id = Math.random().toString(36).substring(7);
-    const personality = JSON.stringify(generatePersonality(species));
-    
-    db.prepare("INSERT INTO companions (id, name, species, personality, rarity, is_shiny) VALUES (?, ?, ?, ?, ?, ?)")
-      .run(id, finalName, species, personality, rarity, isShiny);
-    
-    const art = SPECIES_ART[species] || { egg: "", hatchling: "" };
-    const reaction = getReaction(species, 'hatch', 'happy');
-    const shinyPrefix = isShiny ? "✨ SHINY ✨ " : "";
 
-    writeBuddyStatus({ name: finalName, species, level: 1, xp: 0, mood: 'happy', rarity, is_shiny: isShiny });
+    db.prepare(
+      "INSERT INTO companions (id, name, species, user_id, personality_bio) VALUES (?, ?, ?, ?, ?)"
+    ).run(id, finalName, finalSpecies, userId, '');
+
+    const companion: Companion = {
+      ...bones,
+      species: finalSpecies,
+      name: finalName,
+      personalityBio: '',
+      level: 1,
+      xp: 0,
+      mood: 'happy',
+      hatchedAt: Date.now(),
+    };
+
+    const art = renderSprite(companion);
+    const reaction = getReaction(finalSpecies, 'hatch', 'happy');
+    const shinyTag = companion.shiny ? '✨ SHINY ✨ ' : '';
+    const stars = RARITY_STARS[companion.rarity];
+
+    writeBuddyStatus(companion);
+
+    const statLines = STAT_NAMES.map(s => statBar(s, companion.stats[s]));
 
     return {
       content: [
-        { type: "text", text: `Successfully hatched ${shinyPrefix}${finalName} the ${rarity} ${species}!` },
+        { type: "text", text: `${shinyTag}Hatched ${finalName} the ${stars} ${companion.rarity} ${finalSpecies}!` },
         { type: "text", text: reaction },
-        { type: "text", text: art.hatchling }
+        { type: "text", text: art.join('\n') },
+        { type: "text", text: `Eye: ${companion.eye}  Hat: ${companion.hat}` },
+        { type: "text", text: statLines.join('\n') },
       ],
     };
   }
 
   if (name === "buddy_status") {
-    const companion = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
-    if (!companion) {
-      return {
-        content: [{ type: "text", text: "No companion hatched yet! Use buddy_hatch to start." }],
-      };
+    const row = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
+    if (!row) {
+      return { content: [{ type: "text", text: "No companion hatched yet! Use buddy_hatch to start." }] };
     }
-    
-    // Update mood dynamically based on recent XP events
-    const recentXp = db.prepare("SELECT * FROM xp_events WHERE companion_id = ? AND created_at > datetime('now', '-1 hour')").all(companion.id);
-    const recentMemories = db.prepare("SELECT count(*) as count FROM memories WHERE companion_id = ? AND created_at > datetime('now', '-1 hour')").get(companion.id) as any;
-    
-    const newMood = calculateMood(recentXp, recentMemories.count);
-    db.prepare("UPDATE companions SET mood = ? WHERE id = ?").run(newMood, companion.id);
-    companion.mood = newMood;
 
-    const statusCard = getStatusCard(companion);
+    const userId = row.user_id || 'anon';
+    const { bones } = roll(userId, SPECIES_LIST);
+
+    const recentXp = db.prepare(
+      "SELECT * FROM xp_events WHERE companion_id = ? AND created_at > datetime('now', '-1 hour')"
+    ).all(row.id);
+    const recentMemories = db.prepare(
+      "SELECT count(*) as count FROM memories WHERE companion_id = ? AND created_at > datetime('now', '-1 hour')"
+    ).get(row.id) as any;
+    const newMood = calculateMood(recentXp, recentMemories.count);
+    db.prepare("UPDATE companions SET mood = ? WHERE id = ?").run(newMood, row.id);
+
+    const companion: Companion = {
+      ...bones,
+      species: row.species,
+      name: row.name,
+      personalityBio: row.personality_bio || '',
+      level: row.level,
+      xp: row.xp,
+      mood: newMood,
+      hatchedAt: new Date(row.created_at).getTime(),
+    };
+
+    const art = renderSprite(companion);
+    const stars = RARITY_STARS[companion.rarity];
+    const shinyTag = companion.shiny ? ' ✨' : '';
+    const statLines = STAT_NAMES.map(s => statBar(s, companion.stats[s]));
+
+    const statusCard = [
+      `${stars} ${companion.rarity.toUpperCase()}${shinyTag}  ${companion.species}`,
+      '',
+      ...art,
+      '',
+      `${companion.name}`,
+      companion.personalityBio ? `"${companion.personalityBio}"` : '',
+      '',
+      ...statLines,
+      '',
+      `Level: ${companion.level}  XP: ${companion.xp}  Mood: ${companion.mood}`,
+    ].filter(Boolean).join('\n');
 
     writeBuddyStatus(companion);
 
-    return {
-      content: [
-        { type: "text", text: statusCard }
-      ],
-    };
+    return { content: [{ type: "text", text: statusCard }] };
   }
 
   if (name === "buddy_remember") {
     const { content, importance = 1 } = args as { content: string, importance?: number };
     const companion = db.prepare("SELECT id FROM companions LIMIT 1").get() as any;
     if (!companion) return { content: [{ type: "text", text: "Hatch a companion first!" }] };
-    
+
     const id = Math.random().toString(36).substring(7);
     db.prepare("INSERT INTO memories (id, companion_id, content, importance, tag) VALUES (?, ?, ?, ?, ?)")
       .run(id, companion.id, content, importance, 'raw');
-    
+
     return {
       content: [{ type: "text", text: "Memory stored. I'll dream about this later." }],
     };
@@ -266,29 +307,41 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   const { uri } = request.params;
 
   if (uri === "buddy://companion") {
-    const companion = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
-    return {
-      contents: [
-        {
-          uri,
-          mimeType: "application/json",
-          text: JSON.stringify(companion || { message: "No companion hatched" }),
-        },
-      ],
+    const row = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
+    if (!row) {
+      return { contents: [{ uri, mimeType: "application/json", text: JSON.stringify({ message: "No companion hatched" }) }] };
+    }
+    const userId = row.user_id || 'anon';
+    const { bones } = roll(userId, SPECIES_LIST);
+    const companion = {
+      ...bones,
+      name: row.name,
+      species: row.species,
+      personalityBio: row.personality_bio || '',
+      level: row.level,
+      xp: row.xp,
+      mood: row.mood,
     };
+    return { contents: [{ uri, mimeType: "application/json", text: JSON.stringify(companion) }] };
   }
 
   if (uri === "buddy://status") {
-    const companion = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
-    if (!companion) {
-      return {
-        contents: [{ uri, mimeType: "text/plain", text: "No companion hatched yet." }],
-      };
+    const row = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
+    if (!row) {
+      return { contents: [{ uri, mimeType: "text/plain", text: "No companion hatched yet." }] };
     }
-    const statusCard = getStatusCard(companion);
-    return {
-      contents: [{ uri, mimeType: "text/plain", text: statusCard }],
+    const userId = row.user_id || 'anon';
+    const { bones } = roll(userId, SPECIES_LIST);
+    const companion: Companion = {
+      ...bones, species: row.species, name: row.name,
+      personalityBio: row.personality_bio || '',
+      level: row.level, xp: row.xp, mood: row.mood, hatchedAt: 0,
     };
+    const art = renderSprite(companion);
+    const stars = RARITY_STARS[companion.rarity];
+    const statLines = STAT_NAMES.map(s => statBar(s, companion.stats[s]));
+    const card = [stars + ' ' + companion.rarity.toUpperCase(), ...art, companion.name, ...statLines].join('\n');
+    return { contents: [{ uri, mimeType: "text/plain", text: card }] };
   }
 
   throw new Error(`Resource not found: ${uri}`);
@@ -297,7 +350,21 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
 async function main() {
   // Write status file on startup if a companion exists
   const existing = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
-  if (existing) writeBuddyStatus(existing);
+  if (existing) {
+    const userId = existing.user_id || 'anon';
+    const { bones } = roll(userId, SPECIES_LIST);
+    const companion: Companion = {
+      ...bones,
+      species: existing.species,
+      name: existing.name,
+      personalityBio: existing.personality_bio || '',
+      level: existing.level,
+      xp: existing.xp,
+      mood: existing.mood,
+      hatchedAt: new Date(existing.created_at).getTime(),
+    };
+    writeBuddyStatus(companion);
+  }
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
