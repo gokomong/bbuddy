@@ -3,7 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.resolve(__dirname, '../../familiar.db');
+const dbPath = path.resolve(__dirname, '../../buddy.db');
 
 export const db = new Database(dbPath);
 

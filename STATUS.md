@@ -1,4 +1,4 @@
-# STATUS - Project 'Familiar'
+# STATUS - Project 'Buddy'
 
 ## Current Status (2026-04-09)
 Phase P1-2 (Hatching System) is complete and submitted via PR.
@@ -12,10 +12,10 @@ Phase P1-2 (Hatching System) is complete and submitted via PR.
     - Implemented hatching logic for 6 initial species (Void Cat, Rust Hound, Data Drake, Log Golem, Cache Crow, Shell Turtle).
     - Defined naming conventions and personality stat generation (Focus, Curiosity, Loyalty, Energy).
     - Designed and implemented handcrafted ASCII art for 'Egg' and 'Hatchling' stages.
-    - Updated `familiar_hatch` to support optional names and validation.
+    - Updated `buddy_hatch` to support optional names and validation.
 
 ## Next Steps
-- **Dreaming Logic:** Implement actual memory consolidation (deduplication/tagging) in the `familiar_dream` tool.
+- **Dreaming Logic:** Implement actual memory consolidation (deduplication/tagging) in the `buddy_dream` tool.
 - **Evolution Logic:** Hook up XP events and leveling triggers.
 
 ## Assumptions / Open Questions

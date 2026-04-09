@@ -7,17 +7,19 @@ import {
   ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { initDb, db } from "../db/schema.js";
-import { SPECIES, SPECIES_ART, generatePersonality, generateName } from "../lib/species.js";
+import { SPECIES, SPECIES_ART, generatePersonality, generateName, calculateMood, getStatusCard } from "../lib/species.js";
 
 const server = new Server(
   {
-    name: "familiar",
+    name: "buddy",
     version: "1.0.0",
   },
   {
     capabilities: {
       tools: {},
-      resources: {},
+      resources: {
+        subscribe: true,
+      },
     },
   }
 );
@@ -30,8 +32,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
       {
-        name: "familiar_hatch",
-        description: "Hatch a new Familiar companion.",
+        name: "buddy_hatch",
+        description: "Hatch a new Buddy companion.",
         inputSchema: {
           type: "object",
           properties: {
@@ -46,16 +48,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: "familiar_status",
-        description: "Get the current status of your Familiar companion.",
+        name: "buddy_status",
+        description: "Get the current status of your Buddy companion.",
         inputSchema: {
           type: "object",
           properties: {},
         },
       },
       {
-        name: "familiar_remember",
-        description: "Manually add a memory for your Familiar to observe.",
+        name: "buddy_remember",
+        description: "Manually add a memory for your Buddy to observe.",
         inputSchema: {
           type: "object",
           properties: {
@@ -66,7 +68,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: "familiar_dream",
+        name: "buddy_dream",
         description: "Trigger memory consolidation (Dreaming).",
         inputSchema: {
           type: "object",
@@ -84,7 +86,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
-  if (name === "familiar_hatch") {
+  if (name === "buddy_hatch") {
     const { name: requestedName, species } = args as { name?: string, species: string };
     
     if (!Object.values(SPECIES).includes(species as any)) {
@@ -109,26 +111,32 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
   }
 
-  if (name === "familiar_status") {
+  if (name === "buddy_status") {
     const companion = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
     if (!companion) {
       return {
-        content: [{ type: "text", text: "No companion hatched yet! Use familiar_hatch to start." }],
+        content: [{ type: "text", text: "No companion hatched yet! Use buddy_hatch to start." }],
       };
     }
-    const art = SPECIES_ART[companion.species] || { egg: "", hatchling: "" };
-    const personality = JSON.parse(companion.personality || '{}');
-    const statsStr = Object.entries(personality).map(([k, v]) => `${k}: ${v}`).join(", ");
+    
+    // Update mood dynamically based on recent XP events
+    const recentXp = db.prepare("SELECT * FROM xp_events WHERE companion_id = ? AND created_at > datetime('now', '-1 hour')").all(companion.id);
+    const recentMemories = db.prepare("SELECT count(*) as count FROM memories WHERE companion_id = ? AND created_at > datetime('now', '-1 hour')").get(companion.id) as any;
+    
+    const newMood = calculateMood(recentXp, recentMemories.count);
+    db.prepare("UPDATE companions SET mood = ? WHERE id = ?").run(newMood, companion.id);
+    companion.mood = newMood;
+
+    const statusCard = getStatusCard(companion);
 
     return {
       content: [
-        { type: "text", text: `Name: ${companion.name}\nSpecies: ${companion.species}\nLevel: ${companion.level}\nXP: ${companion.xp}\nStats: ${statsStr}` },
-        { type: "text", text: art.hatchling }
+        { type: "text", text: statusCard }
       ],
     };
   }
 
-  if (name === "familiar_remember") {
+  if (name === "buddy_remember") {
     const { content, importance = 1 } = args as { content: string, importance?: number };
     const companion = db.prepare("SELECT id FROM companions LIMIT 1").get() as any;
     if (!companion) return { content: [{ type: "text", text: "Hatch a companion first!" }] };
@@ -142,7 +150,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
   }
 
-  if (name === "familiar_dream") {
+  if (name === "buddy_dream") {
     const { depth } = args as { depth: 'light' | 'deep' };
     // Placeholder for actual consolidation logic
     return {
@@ -158,10 +166,16 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
   return {
     resources: [
       {
-        uri: "familiar://companion",
+        uri: "buddy://companion",
         name: "Current Companion Info",
-        description: "The current state and personality of your Familiar.",
+        description: "The current state and personality of your Buddy.",
         mimeType: "application/json",
+      },
+      {
+        uri: "buddy://status",
+        name: "Current Buddy Status Card",
+        description: "An ASCII status card for the current Buddy, suitable for prompt injection.",
+        mimeType: "text/plain",
       },
     ],
   };
@@ -171,7 +185,7 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
 server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   const { uri } = request.params;
 
-  if (uri === "familiar://companion") {
+  if (uri === "buddy://companion") {
     const companion = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
     return {
       contents: [
@@ -184,13 +198,26 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     };
   }
 
+  if (uri === "buddy://status") {
+    const companion = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
+    if (!companion) {
+      return {
+        contents: [{ uri, mimeType: "text/plain", text: "No companion hatched yet." }],
+      };
+    }
+    const statusCard = getStatusCard(companion);
+    return {
+      contents: [{ uri, mimeType: "text/plain", text: statusCard }],
+    };
+  }
+
   throw new Error(`Resource not found: ${uri}`);
 });
 
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("Familiar MCP Server running on stdio");
+  console.error("Buddy MCP Server running on stdio");
 }
 
 main().catch((error) => {

@@ -15,13 +15,20 @@ export const EGG_ART = `
      '---'
 `;
 
-export const SPECIES_ART: Record<string, { egg: string; hatchling: string }> = {
+export const SPECIES_ART: Record<string, { egg: string; hatchling: string; adult: string }> = {
   [SPECIES.VOID_CAT]: {
     egg: EGG_ART,
     hatchling: `
     |\\---/|
     | o_o |
      \\_^_/
+    `,
+    adult: `
+    |\\      /|
+    | \\____/ |
+    |  o  o  |
+    |   ^^   |
+     \\______/
     `
   },
   [SPECIES.RUST_HOUND]: {
@@ -30,6 +37,13 @@ export const SPECIES_ART: Record<string, { egg: string; hatchling: string }> = {
     /^ ^\\
    / 0 0 \\
    V\\ Y /V
+    `,
+    adult: `
+     / \\__   / \\
+    (   @ \\_/ @ )
+     \\__  Y  __/
+        \\ | /
+         \\|/
     `
   },
   [SPECIES.DATA_DRAKE]: {
@@ -38,6 +52,13 @@ export const SPECIES_ART: Record<string, { egg: string; hatchling: string }> = {
     < ^_^ >
      (0 0)
      ^^ ^^
+    `,
+    adult: `
+       /\\___/\\
+      (  o o  )
+      (  =v=  )
+      /|     |\\
+     / |     | \\
     `
   },
   [SPECIES.LOG_GOLEM]: {
@@ -46,6 +67,14 @@ export const SPECIES_ART: Record<string, { egg: string; hatchling: string }> = {
     [-----]
     [ o o ]
     [  -  ]
+    `,
+    adult: `
+     _______
+    |       |
+    | [o] [o]|
+    |   _   |
+    |_______|
+     |     |
     `
   },
   [SPECIES.CACHE_CROW]: {
@@ -54,6 +83,13 @@ export const SPECIES_ART: Record<string, { egg: string; hatchling: string }> = {
      \\ ^ /
       (V)
      /   \\
+    `,
+    adult: `
+      ___
+     (o o)
+    /| V |\\
+   / |   | \\
+     ^^ ^^
     `
   },
   [SPECIES.SHELL_TURTLE]: {
@@ -62,9 +98,50 @@ export const SPECIES_ART: Record<string, { egg: string; hatchling: string }> = {
      .---.
     ( o o )
      '---'
+    `,
+    adult: `
+       _____
+      /     \\
+     /       \\
+    (  o   o  )
+     \\_______/
+      | | | |
     `
   }
 };
+
+export type Mood = 'happy' | 'content' | 'neutral' | 'curious' | 'grumpy' | 'exhausted';
+
+export function calculateMood(xpEvents: any[], recentInteractions: number): Mood {
+  // Logic: XP burst = happy/curious, No interactions = grumpy, High interactions = content
+  if (recentInteractions > 10) return 'content';
+  if (recentInteractions > 5) return 'happy';
+  if (xpEvents.length > 3) return 'curious';
+  if (recentInteractions === 0) return 'grumpy';
+  return 'neutral';
+}
+
+export function getStatusCard(companion: any): string {
+  const { name, species, level, xp, mood } = companion;
+  const art = SPECIES_ART[species] || { egg: '', hatchling: '', adult: '' };
+  const stage = level >= 10 ? 'adult' : 'hatchling';
+  const ascii = art[stage];
+
+  return `
++---------------------------------------+
+| BUDDY STATUS CARD                     |
++---------------------------------------+
+| Name:    ${name.padEnd(28)} |
+| Species: ${species.padEnd(28)} |
+| Level:   ${level.toString().padEnd(28)} |
+| XP:      ${xp.toString().padEnd(28)} |
+| Mood:    ${mood.padEnd(28)} |
++---------------------------------------+
+${ascii}
++---------------------------------------+
+  `;
+}
+
 
 export function generatePersonality(species: string) {
   // Stats: Focus, Curiosity, Loyalty, Energy
