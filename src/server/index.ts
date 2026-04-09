@@ -14,6 +14,7 @@ import {
 } from "../lib/species.js";
 import { type Companion, STAT_NAMES, RARITY_STARS, RARITY_ANSI } from "../lib/types.js";
 import { roll, statBar } from "../lib/rng.js";
+import { generateBio } from "../lib/personality.js";
 import { writeFileSync, mkdirSync, unlinkSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
@@ -244,15 +245,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const finalName = requestedName || generateName(finalSpecies);
     const id = Math.random().toString(36).substring(7);
 
+    const bio = generateBio(bones);
+
     db.prepare(
       "INSERT INTO companions (id, name, species, user_id, personality_bio) VALUES (?, ?, ?, ?, ?)"
-    ).run(id, finalName, finalSpecies, userId, '');
+    ).run(id, finalName, finalSpecies, userId, bio);
 
     const companion: Companion = {
       ...bones,
       species: finalSpecies,
       name: finalName,
-      personalityBio: '',
+      personalityBio: bio,
       level: 1,
       xp: 0,
       mood: 'happy',
