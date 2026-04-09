@@ -16,10 +16,8 @@ export function initDb() {
       level INTEGER DEFAULT 1,
       xp INTEGER DEFAULT 0,
       mood TEXT DEFAULT 'happy',
-      rarity TEXT DEFAULT 'common',
-      is_shiny INTEGER DEFAULT 0,
-      accessories TEXT DEFAULT '{}', -- JSON blob for items
-      personality TEXT, -- JSON blob of stats
+      personality_bio TEXT DEFAULT '',
+      user_id TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -28,8 +26,8 @@ export function initDb() {
       companion_id TEXT,
       content TEXT NOT NULL,
       importance INTEGER DEFAULT 1,
-      tag TEXT, -- e.g., 'pattern', 'insight', 'raw'
-      metadata TEXT, -- JSON blob for pattern data
+      tag TEXT,
+      metadata TEXT,
       is_consolidated INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY(companion_id) REFERENCES companions(id)
@@ -38,7 +36,7 @@ export function initDb() {
     CREATE TABLE IF NOT EXISTS xp_events (
       id TEXT PRIMARY KEY,
       companion_id TEXT,
-      event_type TEXT NOT NULL, -- 'load', 'bug_caught', 'suggestion_accepted', 'commit', 'active_session'
+      event_type TEXT NOT NULL,
       xp_gained INTEGER NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY(companion_id) REFERENCES companions(id)
