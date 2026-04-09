@@ -3,6 +3,7 @@ import { readFileSync, readdirSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { SPECIES_ANIMATIONS } from "./lib/species.js";
+import { HAT_LINES, RARITY_ANSI, type Hat } from "./lib/types.js";
 
 const RESET = "\x1b[0m";
 const DIM = "\x1b[2m";
@@ -77,12 +78,27 @@ try {
     }
 
     if (ascii) {
-      const asciiLines = ascii.split("\n");
-      const shinyTag = buddy.is_shiny ? " ✨" : "";
-      const nameInfo = `${CYAN}${buddy.name}${RESET} ${DIM}(${buddy.species})${RESET} ${YELLOW}Lv.${buddy.level}${shinyTag}${RESET}`;
-      const moodInfo = `${moodColor(buddy.mood)}${buddy.mood}${RESET} ${DIM}XP:${RESET}${buddy.xp}`;
+      let asciiLines = ascii.split("\n");
 
-      // Build right-side column: art lines with info on the first two
+      // Apply eye substitution if eye is provided
+      if (buddy.eye) {
+        asciiLines = asciiLines.map((line: string) => line.replaceAll('{E}', buddy.eye));
+      }
+
+      // Apply hat overlay on first line if hat is provided and line is blank
+      if (buddy.hat && buddy.hat !== 'none' && asciiLines.length > 0 && !asciiLines[0].trim()) {
+        const hatLine = HAT_LINES[buddy.hat as Hat];
+        if (hatLine) {
+          asciiLines[0] = hatLine;
+        }
+      }
+
+      const shinyTag = buddy.is_shiny ? " ✨" : "";
+      const rarityColor = buddy.rarity ? (RARITY_ANSI[buddy.rarity as keyof typeof RARITY_ANSI] || DIM) : DIM;
+      const stars = buddy.rarity_stars || '';
+      const nameInfo = `${CYAN}${buddy.name}${RESET} ${DIM}(${buddy.species})${RESET} ${YELLOW}Lv.${buddy.level}${shinyTag}${RESET}`;
+      const moodInfo = `${moodColor(buddy.mood)}${buddy.mood}${RESET} ${DIM}XP:${RESET}${buddy.xp} ${rarityColor}${stars}${RESET}`;
+
       const artWidth = Math.max(...asciiLines.map((l: string) => l.length));
       for (let i = 0; i < asciiLines.length; i++) {
         const artPart = `${MAGENTA}${(asciiLines[i] || "").padEnd(artWidth)}${RESET}`;
