@@ -7,6 +7,7 @@ import {
   ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { initDb, db } from "../db/schema.js";
+import { SPECIES, SPECIES_ART, generatePersonality, generateName } from "../lib/species.js";
 
 const server = new Server(
   {
@@ -34,10 +35,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: {
           type: "object",
           properties: {
-            name: { type: "string" },
-            species: { type: "string" }
+            name: { type: "string", description: "Optional name for your companion." },
+            species: { 
+              type: "string", 
+              enum: Object.values(SPECIES),
+              description: "The species of companion to hatch."
+            }
           },
-          required: ["name", "species"]
+          required: ["species"]
         },
       },
       {
@@ -80,11 +85,27 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
   if (name === "familiar_hatch") {
-    const { name, species } = args as { name: string, species: string };
+    const { name: requestedName, species } = args as { name?: string, species: string };
+    
+    if (!Object.values(SPECIES).includes(species as any)) {
+      return {
+        content: [{ type: "text", text: `Unknown species: ${species}. Available: ${Object.values(SPECIES).join(", ")}` }],
+      };
+    }
+
+    const name = requestedName || generateName(species);
     const id = Math.random().toString(36).substring(7);
-    db.prepare("INSERT INTO companions (id, name, species) VALUES (?, ?, ?)").run(id, name, species);
+    const personality = JSON.stringify(generatePersonality(species));
+    
+    db.prepare("INSERT INTO companions (id, name, species, personality) VALUES (?, ?, ?, ?)").run(id, name, species, personality);
+    
+    const art = SPECIES_ART[species] || { egg: "", hatchling: "" };
+    
     return {
-      content: [{ type: "text", text: `Successfully hatched ${name} the ${species}!` }],
+      content: [
+        { type: "text", text: `Successfully hatched ${name} the ${species}!` },
+        { type: "text", text: art.hatchling }
+      ],
     };
   }
 
@@ -95,8 +116,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         content: [{ type: "text", text: "No companion hatched yet! Use familiar_hatch to start." }],
       };
     }
+    const art = SPECIES_ART[companion.species] || { egg: "", hatchling: "" };
+    const personality = JSON.parse(companion.personality || '{}');
+    const statsStr = Object.entries(personality).map(([k, v]) => `${k}: ${v}`).join(", ");
+
     return {
-      content: [{ type: "text", text: `Name: ${companion.name}\nSpecies: ${companion.species}\nLevel: ${companion.level}\nXP: ${companion.xp}` }],
+      content: [
+        { type: "text", text: `Name: ${companion.name}\nSpecies: ${companion.species}\nLevel: ${companion.level}\nXP: ${companion.xp}\nStats: ${statsStr}` },
+        { type: "text", text: art.hatchling }
+      ],
     };
   }
 
