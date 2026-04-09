@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import { type CompanionBones, type Eye, type Hat, HAT_LINES } from './types.js';
 
 export const SPECIES = {
   // Original 6
@@ -25,6 +25,14 @@ export const SPECIES = {
   MUSHROOM: 'Mushroom',
   CHONK: 'Chonk'
 };
+
+export const SPECIES_LIST = [
+  'Void Cat', 'Rust Hound', 'Data Drake', 'Log Golem', 'Cache Crow', 'Shell Turtle',
+  'Duck', 'Goose', 'Blob', 'Octopus', 'Owl', 'Penguin',
+  'Snail', 'Ghost', 'Axolotl', 'Capybara', 'Cactus', 'Robot',
+  'Rabbit', 'Mushroom', 'Chonk',
+] as const;
+export type Species = (typeof SPECIES_LIST)[number];
 
 export const RARITIES = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
 
@@ -399,59 +407,6 @@ ${ascii}
   `;
 }
 
-// FNV-1a Hashing for Deterministic Selection
-function fnv1a(str: string): number {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < str.length; i++) {
-    hash ^= str.charCodeAt(i);
-    hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
-  }
-  return hash >>> 0;
-}
-
-export function determineBuddy(userId: string | null) {
-  const salt = 'friend-2026-401';
-  let seed: number;
-
-  if (userId) {
-    seed = fnv1a(userId + salt);
-  } else {
-    seed = Math.floor(Math.random() * 0xFFFFFFFF);
-  }
-
-  const speciesList = Object.values(SPECIES);
-  const species = speciesList[seed % speciesList.length];
-
-  // Rarity determination
-  const rarityRoll = seed % 1000;
-  let rarity = 'Common';
-  if (rarityRoll < 10) rarity = 'Legendary';
-  else if (rarityRoll < 50) rarity = 'Epic';
-  else if (rarityRoll < 150) rarity = 'Rare';
-  else if (rarityRoll < 400) rarity = 'Uncommon';
-
-  // Shiny determination (0.1% chance)
-  const isShiny = (seed % 1000) === 777; 
-
-  return { species, rarity, isShiny };
-}
-
-export function generatePersonality(species: string) {
-  const baseStats = { focus: 10, curiosity: 10, loyalty: 10, energy: 10 };
-
-  switch (species) {
-    case SPECIES.VOID_CAT: baseStats.curiosity += 5; break;
-    case SPECIES.RUST_HOUND: baseStats.loyalty += 5; break;
-    case SPECIES.DATA_DRAKE: baseStats.focus += 5; break;
-    case SPECIES.ROBOT: baseStats.focus += 10; break;
-    case SPECIES.GHOST: baseStats.curiosity += 10; break;
-    case SPECIES.CHONK: baseStats.energy -= 5; baseStats.loyalty += 5; break;
-    // ... add more as needed
-  }
-
-  return baseStats;
-}
-
 export function generateName(species: string): string {
   const prefixes = ['Bit', 'Hex', 'Zip', 'Log', 'Null', 'Void', 'Rust', 'Data', 'Cyber', 'Neo', 'Giga', 'Nano'];
   const suffixes = ['y', 'o', 'it', 'ox', 'us', 'ix', 'en', 'ly', 'oid', 'bot', 'tron', 'kin'];
@@ -490,4 +445,138 @@ export function getReaction(species: string, event: string, mood: Mood): string 
 
   const pool = speciesReactions[event] || speciesReactions['idle'];
   return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// New format: line arrays with {E} eye placeholder.
+// Used by renderSprite(). Each species has 2-3 frames.
+export const SPRITE_BODIES: Record<string, string[][]> = {
+  'Void Cat': [
+    [' |\\---/|    ', ' | {E}_{E} |    ', '  \\_^_/     '],
+    [' |\\---/|    ', ' | -_- |    ', '  \\_^_/     '],
+  ],
+  'Rust Hound': [
+    [' /^ ^\\      ', '/ {E} {E} \\     ', 'V\\ Y /V     '],
+    [' /^ ^\\      ', '/ - - \\     ', 'V\\ Y /V     '],
+  ],
+  'Data Drake': [
+    [' < ^_^ >    ', '  ({E} {E})     ', '  ^^ ^^     '],
+    [' < ^_^ >    ', '  (- -)     ', '  ^^ ^^     '],
+  ],
+  'Log Golem': [
+    [' [-----]    ', ' [ {E} {E} ]    ', ' [  -  ]    '],
+    [' [-----]    ', ' [ {E} {E} ]    ', ' [  =  ]    '],
+  ],
+  'Cache Crow': [
+    ['  \\ ^ /     ', '   (V)      ', '  /   \\     '],
+    ['  \\ v /     ', '   (V)      ', '  /   \\     '],
+  ],
+  'Shell Turtle': [
+    ['  .---.     ', ' ( {E} {E} )    ', "  '---'     "],
+    ['  .---.     ', ' ( - - )    ', "  '---'     "],
+  ],
+  'Duck': [
+    ['  __({E})<    ', '  \\___) ~   '],
+    ['  __({E})>    ', '  \\___) ~   '],
+  ],
+  'Goose': [
+    ['  __({E})<    ', '  \\___) !   '],
+    ['  __(O)<    ', '  \\___) !   '],
+  ],
+  'Blob': [
+    ['  .---.     ', ' ( {E} {E} )    ', "  '---'     "],
+    ['  .-.-. ~   ', ' ( {E} {E} )    ', "  '-.-'     "],
+  ],
+  'Octopus': [
+    ['  _({E})_     ', ' (_)(_)     '],
+    ['  _({E})_     ', ' (_) (_)    '],
+  ],
+  'Owl': [
+    ['  {{{E},{E}}}   ', '  ./)_)     ', '   " "      '],
+    ['  {{{-,-}}}   ', '  ./)_)     ', '   " "      '],
+  ],
+  'Penguin': [
+    ['  ({E}_o)     ', '  <(_)      ', '   " "      '],
+    ['  ({E}_o)     ', '  >(_)      ', '   " "      '],
+  ],
+  'Snail': [
+    ['  _{E}_       ', ' (___)      '],
+    ['  _{E}_       ', '  (___)     '],
+  ],
+  'Ghost': [
+    ['  .-.       ', ' ({E} {E})     ', ' | m |      ', " '---'      "],
+    ['  .-.       ', ' ({E} {E})     ', ' | w |      ', " '---'      "],
+  ],
+  'Axolotl': [
+    [' -[{E}_{E}]-    ', "  '---'     "],
+    [' -[^_^]-    ', "  '---'     "],
+  ],
+  'Capybara': [
+    ['  ({E}_o)     ', "  '---'     "],
+    ['  (-_-)     ', "  '---'     "],
+  ],
+  'Cactus': [
+    ['   _|_      ', '  ({E}_{E})     ', "   '|'      "],
+    ['   _|_      ', '  (^_^)     ', "   '|'      "],
+  ],
+  'Robot': [
+    ['  [{E}_{E}]     ', "  '-|-'     "],
+    ['  [O_O]     ', "  '-|-'     "],
+  ],
+  'Rabbit': [
+    ['  (\\ /)     ', '  ({E}_{E})     ', '  c(")(")   '],
+    ['  (| |)     ', '  ({E}_{E})     ', '  c(")(")   '],
+  ],
+  'Mushroom': [
+    ['  .---.     ', ' ( {E} {E} )    ', "  '---'     "],
+    ['  .---.     ', ' ( - - )    ', "  '---'     "],
+  ],
+  'Chonk': [
+    ['  ( {E} {E} )   ', "  '-----'   "],
+    ['  ( - - )   ', "  '-----'   "],
+  ],
+};
+
+export function renderSprite(bones: CompanionBones, frame = 0): string[] {
+  const frames = SPRITE_BODIES[bones.species];
+  if (!frames || frames.length === 0) return ['  (?.?)  '];
+  const body = frames[frame % frames.length]!.map(line =>
+    line.replaceAll('{E}', bones.eye)
+  );
+  const lines = [...body];
+  // Prepend hat line if companion has a hat
+  if (bones.hat !== 'none') {
+    lines.unshift(HAT_LINES[bones.hat]);
+  }
+  return lines;
+}
+
+export function renderFace(bones: CompanionBones): string {
+  const e = bones.eye;
+  switch (bones.species) {
+    case 'Duck': case 'Goose': return `(${e}>`;
+    case 'Blob': return `(${e}${e})`;
+    case 'Void Cat': return `=${e}w${e}=`;
+    case 'Data Drake': return `<${e}~${e}>`;
+    case 'Octopus': return `~(${e}${e})~`;
+    case 'Owl': return `(${e})(${e})`;
+    case 'Penguin': return `(${e}>)`;
+    case 'Shell Turtle': return `[${e}_${e}]`;
+    case 'Snail': return `${e}(@)`;
+    case 'Ghost': return `/${e}${e}\\`;
+    case 'Axolotl': return `}${e}.${e}{`;
+    case 'Capybara': return `(${e}oo${e})`;
+    case 'Cactus': return `|${e}  ${e}|`;
+    case 'Robot': return `[${e}${e}]`;
+    case 'Rabbit': return `(${e}..${e})`;
+    case 'Mushroom': return `|${e}  ${e}|`;
+    case 'Chonk': return `(${e}.${e})`;
+    case 'Rust Hound': return `/${e} ${e}\\`;
+    case 'Log Golem': return `[${e} ${e}]`;
+    case 'Cache Crow': return `(${e}V${e})`;
+    default: return `(${e}_${e})`;
+  }
+}
+
+export function spriteFrameCount(species: string): number {
+  return SPRITE_BODIES[species]?.length ?? 1;
 }
