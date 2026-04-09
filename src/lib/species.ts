@@ -144,6 +144,228 @@ export const SPECIES_ART: Record<string, { egg: string; hatchling: string; adult
   }
 };
 
+// Animation frames for idle statusline display (2-3 frames per species per stage)
+// The statusline wrapper cycles through these using Date.now()
+export const SPECIES_ANIMATIONS: Record<string, { hatchling: string[]; adult: string[] }> = {
+  [SPECIES.VOID_CAT]: {
+    hatchling: [
+      ` |\\---/| \n | o_o | \n  \\_^_/ `,
+      ` |\\---/| \n | -_- | \n  \\_^_/ `,
+      ` |\\---/| \n | o_o | \n  \\_^_/ `,
+    ],
+    adult: [
+      ` |\\      /| \n | \\____/ | \n |  o  o  | \n |   ^^   | \n  \\______/ `,
+      ` |\\      /| \n | \\____/ | \n |  -  -  | \n |   ^^   | \n  \\______/ `,
+      ` |\\      /| \n | \\____/ | \n |  o  o  | \n |   ^^   | \n  \\______/ `,
+    ],
+  },
+  [SPECIES.RUST_HOUND]: {
+    hatchling: [
+      ` /^ ^\\ \n/ 0 0 \\ \nV\\ Y /V `,
+      ` /^ ^\\ \n/ - - \\ \nV\\ Y /V `,
+    ],
+    adult: [
+      `  / \\__   / \\ \n (   @ \\_/ @ ) \n  \\__  Y  __/ \n     \\ | / \n      \\|/ `,
+      `  / \\__   / \\ \n (   @ \\_/ @ ) \n  \\__  Y  __/ \n     \\|/ \n      | `,
+    ],
+  },
+  [SPECIES.DATA_DRAKE]: {
+    hatchling: [
+      ` < ^_^ > \n  (0 0) \n  ^^ ^^ `,
+      ` < ^_^ > \n  (- -) \n  ^^ ^^ `,
+    ],
+    adult: [
+      `    /\\___/\\ \n   (  o o  ) \n   (  =v=  ) \n   /|     |\\ \n  / |     | \\ `,
+      `    /\\___/\\ \n   (  - -  ) \n   (  =v=  ) \n   /|     |\\ \n  / |     | \\ `,
+    ],
+  },
+  [SPECIES.LOG_GOLEM]: {
+    hatchling: [
+      ` [-----] \n [ o o ] \n [  -  ] `,
+      ` [-----] \n [ o o ] \n [  =  ] `,
+    ],
+    adult: [
+      `  _______ \n |       | \n | [o] [o]| \n |   _   | \n |_______| \n  |     | `,
+      `  _______ \n |       | \n | [o] [o]| \n |   -   | \n |_______| \n  |     | `,
+    ],
+  },
+  [SPECIES.CACHE_CROW]: {
+    hatchling: [
+      `  \\ ^ / \n   (V) \n  /   \\ `,
+      `  \\ v / \n   (V) \n  /   \\ `,
+    ],
+    adult: [
+      `   ___ \n  (o o) \n /| V |\\ \n/ |   | \\ \n  ^^ ^^ `,
+      `   ___ \n  (- -) \n /| V |\\ \n/ |   | \\ \n  ^^ ^^ `,
+    ],
+  },
+  [SPECIES.SHELL_TURTLE]: {
+    hatchling: [
+      `  .---. \n ( o o ) \n  '---' `,
+      `  .---. \n ( - - ) \n  '---' `,
+    ],
+    adult: [
+      `    _____ \n   /     \\ \n  /       \\ \n (  o   o  ) \n  \\_______/ \n   | | | | `,
+      `    _____ \n   /     \\ \n  /       \\ \n (  -   -  ) \n  \\_______/ \n   | | | | `,
+    ],
+  },
+  [SPECIES.DUCK]: {
+    hatchling: [
+      `  __(.)< \n  \\___) `,
+      `  __(.)> \n  \\___) `,
+    ],
+    adult: [
+      `      __ \n    <(o )___ \n     ( ._> / \n      '---' `,
+      `      __ \n    <(- )___ \n     ( ._> / \n      '---' `,
+    ],
+  },
+  [SPECIES.GOOSE]: {
+    hatchling: [
+      `  __(.)< \n  \\___) `,
+      `  __(O)< \n  \\___) `,
+    ],
+    adult: [
+      `     __ \n   __ >(.) \n  \\___) | \n   |    | \n   '----' `,
+      `     __ \n   __ >(O) \n  \\___) | \n   |    | \n   '----' `,
+    ],
+  },
+  [SPECIES.BLOB]: {
+    hatchling: [
+      `  .---. \n ( o o ) \n  '---' `,
+      `  .-.-. \n ( o o ) \n  '-.-' `,
+    ],
+    adult: [
+      `   .---. \n  /     \\ \n (  o o  ) \n  '-----' `,
+      `   .-.-. \n  /     \\ \n (  o o  ) \n  '-.-.-' `,
+    ],
+  },
+  [SPECIES.OCTOPUS]: {
+    hatchling: [
+      `  _(")_ \n (_)(_) `,
+      `  _(")_ \n (_) (_)`,
+    ],
+    adult: [
+      `    _---_ \n   /     \\ \n  (  o o  ) \n   \\_---_/ \n  /|/| |\\|\\ `,
+      `    _---_ \n   /     \\ \n  (  o o  ) \n   \\_---_/ \n  \\|\\| |/|/ `,
+    ],
+  },
+  [SPECIES.OWL]: {
+    hatchling: [
+      `  {o,o} \n  ./)_) \n   " " `,
+      `  {-,-} \n  ./)_) \n   " " `,
+    ],
+    adult: [
+      `   ___ \n  {o,o} \n  |)__) \n  -"-"- `,
+      `   ___ \n  {-,-} \n  |)__) \n  -"-"- `,
+    ],
+  },
+  [SPECIES.PENGUIN]: {
+    hatchling: [
+      `  (o_o) \n  <(_) \n   " " `,
+      `  (o_o) \n  >(_) \n   " " `,
+    ],
+    adult: [
+      `   (o_o) \n  /(_)_\\ \n   (_) \n   " " `,
+      `   (-_-) \n  /(_)_\\ \n   (_) \n   " " `,
+    ],
+  },
+  [SPECIES.SNAIL]: {
+    hatchling: [
+      `  _@_ \n (___) `,
+      `  _@_ \n  (___) `,
+    ],
+    adult: [
+      `    _@_ \n  _(   )_ \n (_______) `,
+      `    _@_ \n   _(   )_ \n  (_______) `,
+    ],
+  },
+  [SPECIES.GHOST]: {
+    hatchling: [
+      `  .-. \n (o o) \n | m | \n '---' `,
+      `  .-. \n (O O) \n | m | \n '---' `,
+      `  .-. \n (o o) \n | w | \n '---' `,
+    ],
+    adult: [
+      `   .-. \n  (o o) \n  | O | \n  |   | \n  '---' `,
+      `   .-. \n  (O O) \n  | o | \n  |   | \n  '---' `,
+      `   .-. \n  (o o) \n  | O | \n  |   | \n  '~~' `,
+    ],
+  },
+  [SPECIES.AXOLOTL]: {
+    hatchling: [
+      ` -[o_o]- \n  '---' `,
+      ` -[^_^]- \n  '---' `,
+    ],
+    adult: [
+      `  /\\___/\\ \n -[ o o ]- \n  (  v  ) \n   '---' `,
+      `  /\\___/\\ \n -[ ^ ^ ]- \n  (  v  ) \n   '---' `,
+    ],
+  },
+  [SPECIES.CAPYBARA]: {
+    hatchling: [
+      `  (o_o) \n  '---' `,
+      `  (-_-) \n  '---' `,
+    ],
+    adult: [
+      `    .---. \n   ( o o ) \n  /|  -  |\\ \n   '-----' `,
+      `    .---. \n   ( -_- ) \n  /|  -  |\\ \n   '-----' `,
+    ],
+  },
+  [SPECIES.CACTUS]: {
+    hatchling: [
+      `   _|_ \n  (o_o) \n   '|' `,
+      `   _|_ \n  (^_^) \n   '|' `,
+    ],
+    adult: [
+      `   _|_ \n  | o | \n -|   |- \n  |___| `,
+      `   _|_ \n  | ^ | \n -|   |- \n  |___| `,
+    ],
+  },
+  [SPECIES.ROBOT]: {
+    hatchling: [
+      `  [o_o] \n  '-|-' `,
+      `  [O_O] \n  '-|-' `,
+      `  [o_o] \n  '-|-' `,
+    ],
+    adult: [
+      `   [o_o] \n  /|___|\\ \n   |   | \n   '---' `,
+      `   [O_O] \n  /|___|\\ \n   |   | \n   '---' `,
+      `   [o_o] \n  /|___|\\ \n   |   | \n   '---' `,
+    ],
+  },
+  [SPECIES.RABBIT]: {
+    hatchling: [
+      `  (\\ /) \n  (o_o) \n  c(")(") `,
+      `  (| |) \n  (o_o) \n  c(")(") `,
+    ],
+    adult: [
+      `  (\\ /) \n  (o o) \n  (> <) \n  c(")(") `,
+      `  (| |) \n  (o o) \n  (> <) \n  c(")(") `,
+    ],
+  },
+  [SPECIES.MUSHROOM]: {
+    hatchling: [
+      `  .---. \n ( o o ) \n  '---' `,
+      `  .---. \n ( - - ) \n  '---' `,
+    ],
+    adult: [
+      `   .---. \n  (     ) \n   |o o| \n   '---' `,
+      `   .---. \n  (     ) \n   |- -| \n   '---' `,
+    ],
+  },
+  [SPECIES.CHONK]: {
+    hatchling: [
+      `  ( o o ) \n  '-----' `,
+      `  ( - - ) \n  '-----' `,
+    ],
+    adult: [
+      `   .-------. \n  /         \\ \n (   o   o   ) \n  \\    v    / \n   '-------' `,
+      `   .-------. \n  /         \\ \n (   -   -   ) \n  \\    v    / \n   '-------' `,
+      `   .-------. \n  /         \\ \n (   o   o   ) \n  \\    w    / \n   '-------' `,
+    ],
+  },
+};
+
 export type Mood = 'happy' | 'content' | 'neutral' | 'curious' | 'grumpy' | 'exhausted';
 
 export function calculateMood(xpEvents: any[], recentInteractions: number): Mood {

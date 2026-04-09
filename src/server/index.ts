@@ -8,6 +8,30 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { initDb, db } from "../db/schema.js";
 import { SPECIES, SPECIES_ART, generatePersonality, generateName, calculateMood, getStatusCard, determineBuddy, getReaction } from "../lib/species.js";
+import { writeFileSync, mkdirSync, unlinkSync } from "fs";
+import { join } from "path";
+import { homedir } from "os";
+
+const BUDDY_STATUS_PATH = join(homedir(), ".claude", "buddy-status.json");
+
+function writeBuddyStatus(companion: any) {
+  if (!companion) return;
+  const art = SPECIES_ART[companion.species] || { egg: "", hatchling: "", adult: "" };
+  const stage = companion.level >= 10 ? "adult" : "hatchling";
+  try {
+    mkdirSync(join(homedir(), ".claude"), { recursive: true });
+    writeFileSync(BUDDY_STATUS_PATH, JSON.stringify({
+      name: companion.name,
+      species: companion.species,
+      level: companion.level,
+      xp: companion.xp,
+      mood: companion.mood,
+      rarity: companion.rarity,
+      is_shiny: companion.is_shiny,
+      ascii: art[stage],
+    }));
+  } catch { /* non-fatal */ }
+}
 
 const server = new Server(
   {
@@ -77,6 +101,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
           required: ["depth"]
         },
+      },
+      {
+        name: "buddy_respawn",
+        description: "Release your current Buddy companion and clear all data. Use buddy_hatch afterwards to get a new one.",
+        inputSchema: {
+          type: "object",
+          properties: {},
+        },
       }
     ],
   };
@@ -116,7 +148,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const art = SPECIES_ART[species] || { egg: "", hatchling: "" };
     const reaction = getReaction(species, 'hatch', 'happy');
     const shinyPrefix = isShiny ? "✨ SHINY ✨ " : "";
-    
+
+    writeBuddyStatus({ name: finalName, species, level: 1, xp: 0, mood: 'happy', rarity, is_shiny: isShiny });
+
     return {
       content: [
         { type: "text", text: `Successfully hatched ${shinyPrefix}${finalName} the ${rarity} ${species}!` },
@@ -144,6 +178,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     const statusCard = getStatusCard(companion);
 
+    writeBuddyStatus(companion);
+
     return {
       content: [
         { type: "text", text: statusCard }
@@ -170,6 +206,35 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // Placeholder for actual consolidation logic
     return {
       content: [{ type: "text", text: `Consolidation (${depth} dream) started. Checking patterns...` }],
+    };
+  }
+
+  if (name === "buddy_respawn") {
+    const companion = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
+    if (!companion) {
+      return {
+        content: [{ type: "text", text: "No companion to release. Use buddy_hatch to get started!" }],
+      };
+    }
+
+    const oldName = companion.name;
+    const oldSpecies = companion.species;
+
+    // Clear all related data
+    db.prepare("DELETE FROM sessions WHERE companion_id = ?").run(companion.id);
+    db.prepare("DELETE FROM evolution_history WHERE companion_id = ?").run(companion.id);
+    db.prepare("DELETE FROM xp_events WHERE companion_id = ?").run(companion.id);
+    db.prepare("DELETE FROM memories WHERE companion_id = ?").run(companion.id);
+    db.prepare("DELETE FROM companions WHERE id = ?").run(companion.id);
+
+    // Remove status file
+    try { unlinkSync(BUDDY_STATUS_PATH); } catch { /* already gone */ }
+
+    return {
+      content: [
+        { type: "text", text: `${oldName} the ${oldSpecies} has been released. Goodbye, friend!` },
+        { type: "text", text: "Use buddy_hatch to welcome a new companion." },
+      ],
     };
   }
 
@@ -230,6 +295,10 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
 });
 
 async function main() {
+  // Write status file on startup if a companion exists
+  const existing = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
+  if (existing) writeBuddyStatus(existing);
+
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("Buddy MCP Server running on stdio");
