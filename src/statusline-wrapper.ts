@@ -89,7 +89,9 @@ try {
 
     // Try to use new sprite format if eye data is available
     if (buddy.eye && SPRITE_BODIES[buddy.species]) {
-      const bones = { species: buddy.species, eye: buddy.eye, hat: buddy.hat || 'none', rarity: buddy.rarity || 'common', shiny: buddy.is_shiny || false, stats: buddy.stats || {} } as any;
+      // Force hat: 'none' in statusline — hat adds an extra line that spills past the HUD.
+      // Hats are shown in the card display instead.
+      const bones = { species: buddy.species, eye: buddy.eye, hat: 'none', rarity: buddy.rarity || 'common', shiny: buddy.is_shiny || false, stats: buddy.stats || {} } as any;
       const frames = SPRITE_BODIES[buddy.species];
       const totalFrames = frames.length;
       const hasReaction = buddy.reaction_expires && Date.now() < buddy.reaction_expires;
@@ -149,13 +151,8 @@ try {
     if (ascii) {
       let asciiLines = ascii.split("\n");
 
-      // Apply hat overlay on first line if hat is provided and line is blank
-      if (buddy.hat && buddy.hat !== 'none' && asciiLines.length > 0 && !asciiLines[0].trim()) {
-        const hatLine = HAT_LINES[buddy.hat as Hat];
-        if (hatLine) {
-          asciiLines[0] = hatLine;
-        }
-      }
+      // Hat rendering skipped in statusline — adds extra line that spills past HUD.
+      // Hats are visible in the card display (/buddy status).
 
       // Apply reaction state (eye override + indicator) if active and not expired
       let reactionIndicator = '';
