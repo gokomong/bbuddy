@@ -6,7 +6,8 @@ export type StatName = (typeof STAT_NAMES)[number];
 export const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'] as const;
 export type Rarity = (typeof RARITIES)[number];
 
-export const EYES = ['·', '✦', '×', '◉', '@', '°'] as const;
+// ✦ (star) reserved for level-up sparkle effect, not in default pool
+export const EYES = ['·', 'o', '×', '◉', '@', '°'] as const;
 export type Eye = (typeof EYES)[number];
 
 export const HATS = ['none', 'crown', 'tophat', 'propeller', 'halo', 'wizard', 'beanie', 'tinyduck'] as const;
