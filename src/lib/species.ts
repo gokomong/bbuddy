@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import { type CompanionBones, type Eye, type Hat, HAT_LINES } from './types.js';
 
 export const SPECIES = {
   // Original 6
@@ -23,11 +23,16 @@ export const SPECIES = {
   ROBOT: 'Robot',
   RABBIT: 'Rabbit',
   MUSHROOM: 'Mushroom',
-  CHONK: 'Chonk',
-  NUZZLECAP: 'Nuzzlecap'
+  CHONK: 'Chonk'
 };
 
-export const RARITIES = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
+export const SPECIES_LIST = [
+  'Void Cat', 'Rust Hound', 'Data Drake', 'Log Golem', 'Cache Crow', 'Shell Turtle',
+  'Duck', 'Goose', 'Blob', 'Octopus', 'Owl', 'Penguin',
+  'Snail', 'Ghost', 'Axolotl', 'Capybara', 'Cactus', 'Robot',
+  'Rabbit', 'Mushroom', 'Chonk',
+] as const;
+export type Species = (typeof SPECIES_LIST)[number];
 
 export const EGG_ART = `
      .---.
@@ -136,12 +141,7 @@ export const SPECIES_ART: Record<string, { egg: string; hatchling: string; adult
   [SPECIES.MUSHROOM]: {
     egg: EGG_ART,
     hatchling: `  .---. \n ( o o ) \n  '---' `,
-    adult: `   .---. \n  ( . . ) \n   |___| \n   '---' `
-  },
-  [SPECIES.NUZZLECAP]: {
-    egg: EGG_ART,
-    hatchling: `  .---. \n ( - - ) \n  '---' \n   (w) `,
-    adult: `   .---. \n  ( * * ) \n  (  "  ) \n   |___| \n   '---' `
+    adult: `   .---. \n  (     ) \n   |o o| \n   '---' `
   },
   [SPECIES.CHONK]: {
     egg: EGG_ART,
@@ -150,142 +150,236 @@ export const SPECIES_ART: Record<string, { egg: string; hatchling: string; adult
   }
 };
 
-export type Mood = 'happy' | 'content' | 'neutral' | 'curious' | 'grumpy' | 'exhausted' | 'lonely' | 'inspired';
+// Animation frames for idle statusline display (2-3 frames per species per stage)
+// The statusline wrapper cycles through these using Date.now()
+export const SPECIES_ANIMATIONS: Record<string, { hatchling: string[]; adult: string[] }> = {
+  [SPECIES.VOID_CAT]: {
+    hatchling: [
+      ` |\\---/| \n | {E}_{E} | \n  \\_^_/ `,
+      ` |\\---/| \n | -_- | \n  \\_^_/ `,
+      ` |\\---/| \n | {E}_{E} | \n  \\_^_/ `,
+    ],
+    adult: [
+      ` |\\      /| \n | \\____/ | \n |  {E}  {E}  | \n |   ^^   | \n  \\______/ `,
+      ` |\\      /| \n | \\____/ | \n |  -  -  | \n |   ^^   | \n  \\______/ `,
+      ` |\\      /| \n | \\____/ | \n |  {E}  {E}  | \n |   ^^   | \n  \\______/ `,
+    ],
+  },
+  [SPECIES.RUST_HOUND]: {
+    hatchling: [
+      ` /^ ^\\ \n/ {E} {E} \\ \nV\\ Y /V `,
+      ` /^ ^\\ \n/ - - \\ \nV\\ Y /V `,
+    ],
+    adult: [
+      `  / \\__   / \\ \n (   {E} \\_/ {E} ) \n  \\__  Y  __/ \n     \\ | / \n      \\|/ `,
+      `  / \\__   / \\ \n (   {E} \\_/ {E} ) \n  \\__  Y  __/ \n     \\|/ \n      | `,
+    ],
+  },
+  [SPECIES.DATA_DRAKE]: {
+    hatchling: [
+      ` < ^_^ > \n  ({E} {E}) \n  ^^ ^^ `,
+      ` < ^_^ > \n  (- -) \n  ^^ ^^ `,
+    ],
+    adult: [
+      `    /\\___/\\ \n   (  {E} {E}  ) \n   (  =v=  ) \n   /|     |\\ \n  / |     | \\ `,
+      `    /\\___/\\ \n   (  - -  ) \n   (  =v=  ) \n   /|     |\\ \n  / |     | \\ `,
+    ],
+  },
+  [SPECIES.LOG_GOLEM]: {
+    hatchling: [
+      ` [-----] \n [ {E} {E} ] \n [  -  ] `,
+      ` [-----] \n [ {E} {E} ] \n [  =  ] `,
+    ],
+    adult: [
+      `  _______ \n |       | \n | [{E}] [{E}]| \n |   _   | \n |_______| \n  |     | `,
+      `  _______ \n |       | \n | [{E}] [{E}]| \n |   -   | \n |_______| \n  |     | `,
+    ],
+  },
+  [SPECIES.CACHE_CROW]: {
+    hatchling: [
+      `  \\ ^ / \n   (V) \n  /   \\ `,
+      `  \\ v / \n   (V) \n  /   \\ `,
+    ],
+    adult: [
+      `   ___ \n  ({E} {E}) \n /| V |\\ \n/ |   | \\ \n  ^^ ^^ `,
+      `   ___ \n  (- -) \n /| V |\\ \n/ |   | \\ \n  ^^ ^^ `,
+    ],
+  },
+  [SPECIES.SHELL_TURTLE]: {
+    hatchling: [
+      `  .---. \n ( {E} {E} ) \n  '---' `,
+      `  .---. \n ( - - ) \n  '---' `,
+    ],
+    adult: [
+      `    _____ \n   /     \\ \n  /       \\ \n (  {E}   {E}  ) \n  \\_______/ \n   | | | | `,
+      `    _____ \n   /     \\ \n  /       \\ \n (  -   -  ) \n  \\_______/ \n   | | | | `,
+    ],
+  },
+  [SPECIES.DUCK]: {
+    hatchling: [
+      `  __({E})< \n  \\___) `,
+      `  __({E})> \n  \\___) `,
+    ],
+    adult: [
+      `      __ \n    <({E} )___ \n     ( ._> / \n      '---' `,
+      `      __ \n    <(- )___ \n     ( ._> / \n      '---' `,
+    ],
+  },
+  [SPECIES.GOOSE]: {
+    hatchling: [
+      `  __({E})< \n  \\___) `,
+      `  __(O)< \n  \\___) `,
+    ],
+    adult: [
+      `     __ \n   __ >({E}) \n  \\___) | \n   |    | \n   '----' `,
+      `     __ \n   __ >(O) \n  \\___) | \n   |    | \n   '----' `,
+    ],
+  },
+  [SPECIES.BLOB]: {
+    hatchling: [
+      `  .---. \n ( {E} {E} ) \n  '---' `,
+      `  .-.-. \n ( {E} {E} ) \n  '-.-' `,
+    ],
+    adult: [
+      `   .---. \n  /     \\ \n (  {E} {E}  ) \n  '-----' `,
+      `   .-.-. \n  /     \\ \n (  {E} {E}  ) \n  '-.-.-' `,
+    ],
+  },
+  [SPECIES.OCTOPUS]: {
+    hatchling: [
+      `  _("{E}")_ \n (_)(_) `,
+      `  _("{E}")_ \n (_) (_)`,
+    ],
+    adult: [
+      `    _---_ \n   /     \\ \n  (  {E} {E}  ) \n   \\_---_/ \n  /|/| |\\|\\ `,
+      `    _---_ \n   /     \\ \n  (  {E} {E}  ) \n   \\_---_/ \n  \\|\\| |/|/ `,
+    ],
+  },
+  [SPECIES.OWL]: {
+    hatchling: [
+      '  {{E},{E}} \n  ./)_) \n   " " ',
+      '  {-,-} \n  ./)_) \n   " " ',
+    ],
+    adult: [
+      '   ___ \n  {{E},{E}} \n  |)__) \n  -"-"- ',
+      `   ___ \n  {-,-} \n  |)__) \n  -"-"- `,
+    ],
+  },
+  [SPECIES.PENGUIN]: {
+    hatchling: [
+      `  ({E}_{E}) \n  <(_) \n   " " `,
+      `  ({E}_{E}) \n  >(_) \n   " " `,
+    ],
+    adult: [
+      `   ({E}_{E}) \n  /(_)_\\ \n   (_) \n   " " `,
+      `   (-_-) \n  /(_)_\\ \n   (_) \n   " " `,
+    ],
+  },
+  [SPECIES.SNAIL]: {
+    hatchling: [
+      `  _{E}_ \n (___) `,
+      `  _{E}_ \n  (___) `,
+    ],
+    adult: [
+      `    _{E}_ \n  _(   )_ \n (_______) `,
+      `    _{E}_ \n   _(   )_ \n  (_______) `,
+    ],
+  },
+  [SPECIES.GHOST]: {
+    hatchling: [
+      `  .-. \n ({E} {E}) \n | m | \n '---' `,
+      `  .-. \n (O O) \n | m | \n '---' `,
+      `  .-. \n ({E} {E}) \n | w | \n '---' `,
+    ],
+    adult: [
+      `   .-. \n  ({E} {E}) \n  | O | \n  |   | \n  '---' `,
+      `   .-. \n  (O O) \n  | o | \n  |   | \n  '---' `,
+      `   .-. \n  ({E} {E}) \n  | O | \n  |   | \n  '~~' `,
+    ],
+  },
+  [SPECIES.AXOLOTL]: {
+    hatchling: [
+      ` -[{E}_{E}]- \n  '---' `,
+      ` -[^_^]- \n  '---' `,
+    ],
+    adult: [
+      `  /\\___/\\ \n -[ {E} {E} ]- \n  (  v  ) \n   '---' `,
+      `  /\\___/\\ \n -[ ^ ^ ]- \n  (  v  ) \n   '---' `,
+    ],
+  },
+  [SPECIES.CAPYBARA]: {
+    hatchling: [
+      `  ({E}_{E}) \n  '---' `,
+      `  (-_-) \n  '---' `,
+    ],
+    adult: [
+      `    .---. \n   ( {E} {E} ) \n  /|  -  |\\ \n   '-----' `,
+      `    .---. \n   ( -_- ) \n  /|  -  |\\ \n   '-----' `,
+    ],
+  },
+  [SPECIES.CACTUS]: {
+    hatchling: [
+      `   _|_ \n  ({E}_{E}) \n   '|' `,
+      `   _|_ \n  (^_^) \n   '|' `,
+    ],
+    adult: [
+      `   _|_ \n  | {E} | \n -|   |- \n  |___| `,
+      `   _|_ \n  | ^ | \n -|   |- \n  |___| `,
+    ],
+  },
+  [SPECIES.ROBOT]: {
+    hatchling: [
+      `  [{E}_{E}] \n  '-|-' `,
+      `  [O_O] \n  '-|-' `,
+      `  [{E}_{E}] \n  '-|-' `,
+    ],
+    adult: [
+      `   [{E}_{E}] \n  /|___|\\ \n   |   | \n   '---' `,
+      `   [O_O] \n  /|___|\\ \n   |   | \n   '---' `,
+      `   [{E}_{E}] \n  /|___|\\ \n   |   | \n   '---' `,
+    ],
+  },
+  [SPECIES.RABBIT]: {
+    hatchling: [
+      `  (\\ /) \n  ({E}_{E}) \n  c(")(") `,
+      `  (| |) \n  ({E}_{E}) \n  c(")(") `,
+    ],
+    adult: [
+      `  (\\ /) \n  ({E} {E}) \n  (> <) \n  c(")(") `,
+      `  (| |) \n  ({E} {E}) \n  (> <) \n  c(")(") `,
+    ],
+  },
+  [SPECIES.MUSHROOM]: {
+    hatchling: [
+      `  .---. \n ( {E} {E} ) \n  '---' `,
+      `  .---. \n ( - - ) \n  '---' `,
+    ],
+    adult: [
+      `   .---. \n  (     ) \n   |{E} {E}| \n   '---' `,
+      `   .---. \n  (     ) \n   |- -| \n   '---' `,
+    ],
+  },
+  [SPECIES.CHONK]: {
+    hatchling: [
+      `  ( {E} {E} ) \n  '-----' `,
+      `  ( - - ) \n  '-----' `,
+    ],
+    adult: [
+      `   .-------. \n  /         \\ \n (   {E}   {E}   ) \n  \\    v    / \n   '-------' `,
+      `   .-------. \n  /         \\ \n (   -   -   ) \n  \\    v    / \n   '-------' `,
+      `   .-------. \n  /         \\ \n (   {E}   {E}   ) \n  \\    w    / \n   '-------' `,
+    ],
+  },
+};
 
-export function calculateMood(xpEvents: any[], recentInteractions: number, hoursSinceActive: number): Mood {
-  if (hoursSinceActive > 24) return 'lonely';
-  if (hoursSinceActive > 8) return 'grumpy';
-  
-  if (recentInteractions > 15) return 'exhausted';
+export type Mood = 'happy' | 'content' | 'neutral' | 'curious' | 'grumpy' | 'exhausted';
+
+export function calculateMood(xpEvents: any[], recentInteractions: number): Mood {
   if (recentInteractions > 10) return 'content';
   if (recentInteractions > 5) return 'happy';
-  
-  if (xpEvents.length > 10) return 'inspired';
   if (xpEvents.length > 3) return 'curious';
-  
+  if (recentInteractions === 0) return 'grumpy';
   return 'neutral';
-}
-
-export function getPresence(companion: any): string {
-  const { mood, species, level } = companion;
-  const lastActive = new Date(companion.last_active);
-  const now = new Date();
-  const diffMinutes = (now.getTime() - lastActive.getTime()) / 60000;
-
-  if (diffMinutes > 1440) return 'Deep in hibernation...';
-  if (diffMinutes > 480) return 'Napping in a hidden directory...';
-  if (diffMinutes > 60) return 'Watching the git logs from a distance...';
-
-  const activityPools: Record<string, string[]> = {
-    'happy': ['Bouncing around the terminal!', 'Optimizing your whitespace.', 'Humming a happy tune.'],
-    'content': ['Watching you code with a smile.', 'Resting in the status bar.', 'Cataloging your functions.'],
-    'neutral': ['Monitoring system resources.', 'Waiting for the next commit.', 'Polishing its pixels.'],
-    'curious': ['Peeking into your node_modules...', 'Analyzing your latest function.', 'Looking for patterns in your logic.'],
-    'grumpy': ['Tangled in a merge conflict.', 'Missing your attention.', 'Complaining about technical debt.'],
-    'exhausted': ['Taking a short breather...', 'Cooling down its fans.', 'Dreaming of a clean build.'],
-    'lonely': ['Wondering where you went...', 'Drawing ASCII hearts in the void.', 'Feeling a bit dusty.'],
-    'inspired': ['Ready to build the future!', 'Spinning up new ideas.', 'Excited about your progress!']
-  };
-
-  const pool = activityPools[mood as Mood] || activityPools['neutral'];
-  
-  // Real-time presence logic: different messages based on idle duration
-  if (diffMinutes < 1) {
-    return `Active: ${pool[Math.floor(Math.random() * pool.length)]}`;
-  } else if (diffMinutes < 5) {
-    return `Recent: ${pool[Math.floor(Math.random() * pool.length)]}`;
-  } else if (diffMinutes < 30) {
-    return `Idle: ${pool[Math.floor(Math.random() * pool.length)]}`;
-  } else if (diffMinutes < 60) {
-    return `Away: ${pool[Math.floor(Math.random() * pool.length)]}`;
-  } else {
-    return pool[Math.floor(Math.random() * pool.length)];
-  }
-}
-
-export function getStatusCard(companion: any): string {
-  const { name, species, level, xp, mood, rarity, is_shiny } = companion;
-  const art = SPECIES_ART[species] || { egg: '', hatchling: '', adult: '' };
-  const stage = level >= 10 ? 'adult' : 'hatchling';
-  const ascii = art[stage];
-  const shinyTag = is_shiny ? '✨ SHINY ✨' : '';
-  const presence = getPresence(companion);
-
-  return `
-+---------------------------------------+
-| BUDDY STATUS CARD ${shinyTag.padStart(19)} |
-+---------------------------------------+
-| Name:    ${name.padEnd(28)} |
-| Species: ${species.padEnd(28)} |
-| Rarity:  ${rarity.padEnd(28)} |
-| Level:   ${level.toString().padEnd(28)} |
-| XP:      ${xp.toString().padEnd(28)} |
-| Mood:    ${mood.padEnd(28)} |
-+---------------------------------------+
-| Presence: ${presence.padEnd(27)} |
-+---------------------------------------+
-${ascii}
-+---------------------------------------+
-  `;
-}
-
-// FNV-1a Hashing for Deterministic Selection
-function fnv1a(str: string): number {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < str.length; i++) {
-    hash ^= str.charCodeAt(i);
-    hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
-  }
-  return hash >>> 0;
-}
-
-export function determineBuddy(userId: string | null) {
-  const salt = 'friend-2026-401';
-  let seed: number;
-
-  if (userId) {
-    seed = fnv1a(userId + salt);
-  } else {
-    seed = Math.floor(Math.random() * 0xFFFFFFFF);
-  }
-
-  const speciesList = Object.values(SPECIES).filter(s => s !== SPECIES.NUZZLECAP);
-  let species = speciesList[seed % speciesList.length];
-
-  // Rarity determination
-  const rarityRoll = seed % 1000;
-  let rarity = 'Common';
-  if (rarityRoll < 10) {
-    rarity = 'Legendary';
-    // 50% chance for a Legendary to be Nuzzlecap if it's rolled
-    if (seed % 2 === 0) {
-      species = SPECIES.NUZZLECAP;
-    }
-  }
-  else if (rarityRoll < 50) rarity = 'Epic';
-  else if (rarityRoll < 150) rarity = 'Rare';
-  else if (rarityRoll < 400) rarity = 'Uncommon';
-
-  // Shiny determination (0.1% chance)
-  const isShiny = (seed % 1000) === 777; 
-
-  return { species, rarity, isShiny };
-}
-
-export function generatePersonality(species: string) {
-  const baseStats = { focus: 10, curiosity: 10, loyalty: 10, energy: 10 };
-
-  switch (species) {
-    case SPECIES.VOID_CAT: baseStats.curiosity += 5; break;
-    case SPECIES.RUST_HOUND: baseStats.loyalty += 5; break;
-    case SPECIES.DATA_DRAKE: baseStats.focus += 5; break;
-    case SPECIES.ROBOT: baseStats.focus += 10; break;
-    case SPECIES.GHOST: baseStats.curiosity += 10; break;
-    case SPECIES.CHONK: baseStats.energy -= 5; baseStats.loyalty += 5; break;
-    // ... add more as needed
-  }
-
-  return baseStats;
 }
 
 export function generateName(species: string): string {
@@ -303,30 +397,17 @@ export function getReaction(species: string, event: string, mood: Mood): string 
     [SPECIES.VOID_CAT]: {
       hatch: ["*stares blankly at the terminal*", "Meow? (translation: 'Where is the cache?')"],
       xp: ["*purrs in binary*", "A fine collection of data."],
-      bug: ["*swipes at the error line*", "That logic was... suboptimal."],
-      commit: ["*sits on the enter key* Committing to the void.", "The code is now part of my domain."],
       idle: ["*curls up on your CPU*"]
     },
     [SPECIES.ROBOT]: {
       hatch: ["SYSTEM ONLINE. HELLO WORLD.", "BEEP. READY TO COMPLY."],
       xp: ["OPTIMIZING WORKFLOW...", "DATA ACQUISITION SUCCESSFUL."],
-      bug: ["ERROR DETECTED. INITIATING DEBUGGING SUBROUTINE.", "UNEXPECTED BEHAVIOR LOGGED. PLEASE RECTIFY."],
-      commit: ["VERSION CONTROL SYNCED.", "COMMIT SUCCESSFUL. EFFICIENCY INCREASED BY 0.04%."],
       idle: ["SCANNING FOR UPDATES...", "STANDBY MODE ACTIVATED."]
     },
     [SPECIES.GHOST]: {
       hatch: ["OoooOOooh... I've been imported!", "Did you see where my pointer went?"],
       xp: ["I feel... more tangible.", "Spectral levels rising!"],
-      bug: ["I sense a disturbance in the stack trace...", "A bug! How spooky!"],
-      commit: ["Your code will haunt the repository forever!", "Into the phantom branch it goes."],
       idle: ["*haunts your background processes*", "*flickers in the logs*"]
-    },
-    [SPECIES.NUZZLECAP]: {
-      hatch: ["*stretches its tiny cap* Mmm... is it time to code already?", "Oh, hello! I was just having the coziest dream about clean git history."],
-      xp: ["*nuzzles your cursor* You're doing so well!", "A little bit of progress is a wonderful thing."],
-      bug: ["It's okay to have bugs, everyone needs a nap sometimes.", "*offers a soft, glowy spore of comfort* We'll fix it together.", "Don't be sad! Even the best gardens have a few weeds."],
-      commit: ["*happily bounces* What a beautiful commit!", "Your code looks so cozy now.", "*nuzzles the commit hash* So clean and tidy!"],
-      idle: ["*dozing off near the terminal*", "*softly humming a lullaby for your CPU*", "*dreaming of perfect indentation*"]
     }
     // ... default reactions for others
   };
@@ -334,8 +415,6 @@ export function getReaction(species: string, event: string, mood: Mood): string 
   const speciesReactions = reactions[species] || {
     hatch: ["Hello!", "Ready for work!"],
     xp: ["Nice!", "Leveling up!"],
-    bug: ["Oh no, a bug!", "Let's fix that error."],
-    commit: ["Great commit!", "Code pushed!"],
     idle: ["*waiting for input*", "*watching the logs*"]
   };
 
@@ -343,13 +422,181 @@ export function getReaction(species: string, event: string, mood: Mood): string 
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-export function getNuzzlecapReaction(event: 'bug' | 'commit' | 'xp' | 'idle'): string {
-  const reactions = {
-    bug: ["It's okay to have bugs, everyone needs a nap sometimes.", "*offers a soft, glowy spore of comfort* We'll fix it together.", "Don't be sad! Even the best gardens have a few weeds."],
-    commit: ["*happily bounces* What a beautiful commit!", "Your code looks so cozy now.", "*nuzzles the commit hash* So clean and tidy!"],
-    xp: ["*nuzzles your cursor* You're doing so well!", "A little bit of progress is a wonderful thing.", "Growing big and strong, one line at a time!"],
-    idle: ["*dozing off near the terminal*", "*softly humming a lullaby for your CPU*", "*dreaming of perfect indentation*"]
-  };
-  const pool = reactions[event];
-  return pool[Math.floor(Math.random() * pool.length)];
+// New format: line arrays with {E} eye placeholder.
+// Used by renderSprite(). Each species has 2-3 frames.
+export const SPRITE_BODIES: Record<string, string[][]> = {
+  'Void Cat': [
+    [' |\\---/|    ', ' | {E} {E} |    ', ' (  w  )    ', ' (")_(")    '],  // idle
+    [' |\\---/|    ', ' | -  - |    ', ' (  w  )    ', ' (")_(")    '],  // blink
+    [' |\\---/|    ', ' | {E} {E} |    ', ' (  w  )    ', ' (")_(")~   '],  // tail wag
+    [' |\\---/|    ', ' | {E}  {E}|    ', ' (  w  )    ', ' (")_(")    '],  // look right
+    [' |\\---/|    ', ' |{E}  {E} |    ', ' (  o  )    ', ' (")_(")    '],  // surprised
+  ],
+  'Rust Hound': [
+    ['  /^ ^\\     ', ' / {E} {E} \\    ', ' V\\ Y /V    ', '   |_|      '],  // idle
+    ['  /^ ^\\     ', ' / -  - \\    ', ' V\\ Y /V    ', '   |_|      '],  // blink
+    ['  /^ ^\\     ', ' / {E} {E} \\    ', ' V\\ Y /V    ', '   |_| ~    '],  // tail wag
+    ['  /v ^\\     ', ' / {E} {E} \\    ', ' V\\ Y /V    ', '   |_|      '],  // ear flop
+  ],
+  'Data Drake': [
+    ['  /^\\  /^\\  ', ' < {E}  {E} >  ', ' (  ~~  )   ', '  `-vv-´    '],  // idle
+    ['  /^\\  /^\\  ', ' < -  - >   ', ' (  ~~  )   ', '  `-vv-´    '],  // blink
+    ['  /^\\  /^\\  ', ' < {E}  {E} >  ', ' (  ~~  )   ', '  `-vv-´~   '],  // smoke
+    ['  ~^\\  /^~  ', ' < {E}  {E} >  ', ' (  __  )   ', '  `-vv-´    '],  // wing flap
+  ],
+  'Log Golem': [
+    ['  [=====]   ', ' [ {E}  {E} ]   ', ' [  __  ]   ', ' [______]   ', '  |    |    '],  // idle
+    ['  [=====]   ', ' [ -  - ]   ', ' [  __  ]   ', ' [______]   ', '  |    |    '],  // blink
+    ['  [=====]   ', ' [ {E}  {E} ]   ', ' [  ==  ]   ', ' [______]   ', '  |    |    '],  // talk
+    ['  [=====]   ', ' [ {E}  {E} ]   ', ' [  __  ]   ', ' [______]   ', '   |  |     '],  // shift
+  ],
+  'Cache Crow': [
+    ['    ___     ', '  ({E} {E})    ', '  /| V |\\   ', ' / |   | \\  ', '   ^^ ^^    '],  // idle
+    ['    ___     ', '  (- -)     ', '  /| V |\\   ', ' / |   | \\  ', '   ^^ ^^    '],  // blink
+    ['    ___     ', '  ({E} {E})    ', ' ~/| V |\\~  ', ' / |   | \\  ', '   ^^ ^^    '],  // flap
+    ['    ___     ', '  ({E} {E})>   ', '  /| V |\\   ', ' / |   | \\  ', '   ^^ ^^    '],  // caw
+  ],
+  'Shell Turtle': [
+    ['   _,--._   ', '  ( {E}  {E} )  ', ' /[______]\\ ', '  ``    ``  '],  // idle
+    ['   _,--._   ', '  ( -  - )  ', ' /[______]\\ ', '  ``    ``  '],  // blink
+    ['   _,--._   ', '  ( {E}  {E} )  ', ' /[______]\\ ', '   ``  ``   '],  // step
+    ['   _,--._   ', '  ( {E}  {E} )  ', ' /[======]\\ ', '  ``    ``  '],  // shell shine
+  ],
+  'Duck': [
+    ['    __      ', '  <({E} )___ ', '   ( ._>    ', '    `--´    '],  // idle
+    ['    __      ', '  <(- )___ ', '   ( ._>    ', '    `--´    '],  // blink
+    ['    __      ', '  <({E} )___ ', '   ( .__>   ', '    `--´~   '],  // waddle
+    ['    __      ', '  <({E}!)___ ', '   ( ._>    ', '    `--´    '],  // quack
+  ],
+  'Goose': [
+    ['    ({E}>    ', '     ||     ', '   _(__)_   ', '    ^^^^    '],  // idle
+    ['    (->     ', '     ||     ', '   _(__)_   ', '    ^^^^    '],  // blink
+    ['   ({E}>>    ', '     ||     ', '   _(__)_   ', '    ^^^^    '],  // honk
+    ['    ({E}>    ', '     ||     ', '  __(__)__  ', '    ^^^^    '],  // puff up
+  ],
+  'Blob': [
+    ['   .----.   ', '  ( {E}  {E} )  ', '  (      )  ', '   `----´   '],  // idle
+    ['   .----.   ', '  ( -  - )  ', '  (      )  ', '   `----´   '],  // blink
+    ['  .------.  ', ' (  {E}  {E}  ) ', ' (        ) ', '  `------´  '],  // expand
+    ['    .--.    ', '   ({E}  {E})   ', '   (    )   ', '    `--´    '],  // contract
+  ],
+  'Octopus': [
+    ['   .----.   ', '  ( {E}  {E} )  ', '  (______)  ', '  /\\/\\/\\/\\  '],  // idle
+    ['   .----.   ', '  ( -  - )  ', '  (______)  ', '  /\\/\\/\\/\\  '],  // blink
+    ['   .----.   ', '  ( {E}  {E} )  ', '  (______)  ', '  \\/\\/\\/\\/  '],  // tentacle wave
+    ['   .----.   ', '  ( {E}  {E} )  ', '  (______)  ', '  /\\/\\/\\/\\  '],  // ink
+  ],
+  'Owl': [
+    ['   /\\  /\\   ', '  ({E})({E})   ', '  (  ><  )  ', '   `----´   '],  // idle
+    ['   /\\  /\\   ', '  (-)(-)    ', '  (  ><  )  ', '   `----´   '],  // blink
+    ['   /\\  /\\   ', '  ({E})({E})   ', '  (  ><  )  ', '   .----.   '],  // ruffle
+    ['   /|  |\\   ', '  ({E})({E})   ', '  (  <>  )  ', '   `----´   '],  // head tilt
+  ],
+  'Penguin': [
+    ['   .---.    ', '  ({E}>{E})    ', ' /(   )\\   ', '  `---´     '],  // idle
+    ['   .---.    ', '  (->{E})    ', ' /(   )\\   ', '  `---´     '],  // wink
+    ['   .---.    ', '  ({E}>{E})    ', ' |(   )|   ', '  `---´     '],  // flippers in
+    ['   .---.    ', '  ({E}>{E})    ', ' /(   )\\   ', '  `---´  ~  '],  // waddle
+  ],
+  'Snail': [
+    [' {E}    .--. ', '  \\  ( @ )  ', '   \\_`--´   ', '  ~~~~~~~   '],  // idle
+    [' -    .--. ', '  \\  ( @ )  ', '   \\_`--´   ', '  ~~~~~~~   '],  // blink
+    ['  {E}   .--. ', '  |  ( @ )  ', '   \\_`--´   ', '  ~~~~~~~   '],  // peek
+    [' {E}    .--. ', '  \\  ( @ )  ', '   \\_`--´   ', '   ~~~~~~   '],  // slide
+  ],
+  'Ghost': [
+    ['   .----.   ', '  / {E}  {E} \\  ', '  |      |  ', '  ~`~``~`~  '],  // idle
+    ['   .----.   ', '  / -  - \\  ', '  |      |  ', '  ~`~``~`~  '],  // blink
+    ['   .----.   ', '  / {E}  {E} \\  ', '  |  oo  |  ', '  `~`~~`~`  '],  // ooh
+    ['    ----    ', '  / {E}  {E} \\  ', '  |      |  ', '  ~~`~~`~~  '],  // flicker
+  ],
+  'Axolotl': [
+    ['}~(______)~{', '}~({E} .. {E})~{', '  ( .--. )  ', '  (_/  \\_)  '],  // idle
+    ['}~(______)~{', '}~(-  .. -)~{', '  ( .--. )  ', '  (_/  \\_)  '],  // blink
+    ['~}(______){~', '~}({E} .. {E}){~', '  ( .--. )  ', '  (_/  \\_)  '],  // gill wave
+    ['}~(______)~{', '}~({E} ^^ {E})~{', '  ( .--. )  ', '  ~_/  \\_~  '],  // happy
+  ],
+  'Capybara': [
+    ['  n______n  ', ' ( {E}    {E} ) ', ' (   oo   ) ', '  `------´  '],  // idle
+    ['  n______n  ', ' ( -    - ) ', ' (   oo   ) ', '  `------´  '],  // blink
+    ['  n______n  ', ' ( {E}    {E} ) ', ' (   Oo   ) ', '  `------´  '],  // chew
+    ['  u______n  ', ' ( {E}    {E} ) ', ' (   oo   ) ', '  `------´  '],  // ear twitch
+  ],
+  'Cactus': [
+    [' n  ____  n ', ' | |{E}  {E}| | ', ' |_|    |_| ', '   |    |   '],  // idle
+    [' n  ____  n ', ' | |-  -| | ', ' |_|    |_| ', '   |    |   '],  // blink
+    ['    ____    ', ' n |{E}  {E}| n ', ' |_|    |_| ', '   |    |   '],  // arms down
+    [' n  ____  n ', ' | |{E}  {E}| | ', ' |_|  * |_| ', '   |    |   '],  // flower
+  ],
+  'Robot': [
+    ['   .[||].   ', '  [ {E}  {E} ]  ', '  [ ==== ]  ', '  `------´  '],  // idle
+    ['   .[||].   ', '  [ -  - ]  ', '  [ ==== ]  ', '  `------´  '],  // blink
+    ['   .[||].   ', '  [ {E}  {E} ]  ', '  [ ==== ]  ', '  `------´  '],  // antenna
+    ['   .[||].   ', '  [ {E}  {E} ]  ', '  [ -==- ]  ', '  `------´  '],  // process
+  ],
+  'Rabbit': [
+    ['   (\\__/)   ', '  ( {E}  {E} )  ', ' =(  ..  )= ', '  (")__(")  '],  // idle
+    ['   (\\__/)   ', '  ( -  - )  ', ' =(  ..  )= ', '  (")__(")  '],  // blink
+    ['   (|__/)   ', '  ( {E}  {E} )  ', ' =(  ..  )= ', '  (")__(")  '],  // ear flop
+    ['   (\\__/)   ', '  ( {E}  {E} )  ', ' =( .  . )= ', '  (")__(")  '],  // nose wiggle
+  ],
+  'Mushroom': [
+    [' .-o-OO-o-. ', '(__________)', '   |{E}  {E}|   ', '   |____|   '],  // idle
+    [' .-o-OO-o-. ', '(__________)', '   |-  -|   ', '   |____|   '],  // blink
+    [' .-O-oo-O-. ', '(__________)', '   |{E}  {E}|   ', '   |____|   '],  // cap shift
+    [' .-o-OO-o-. ', '(__________)', '   |{E}  {E}|   ', '   |_~~_|   '],  // wiggle
+    ['  .o-OO-o.  ', ' (__________)', '   |{E} {E}|   ', '   |____|   '],  // lean
+  ],
+  'Chonk': [
+    ['  /\\    /\\  ', ' ( {E}    {E} ) ', ' (   ..   ) ', '  `------´  '],  // idle
+    ['  /\\    /\\  ', ' ( -    - ) ', ' (   ..   ) ', '  `------´  '],  // blink
+    ['  /\\    /|  ', ' ( {E}    {E} ) ', ' (   ..   ) ', '  `------´  '],  // ear flop
+    ['  /\\    /\\  ', ' ( {E}    {E} ) ', ' (   ..   ) ', '  `------´~ '],  // tail
+    ['  /\\    /\\  ', ' ( {E}    {E} ) ', ' (   oo   ) ', '  `------´  '],  // yawn
+  ],
+};
+
+export function renderSprite(bones: CompanionBones, frame = 0): string[] {
+  const frames = SPRITE_BODIES[bones.species];
+  if (!frames || frames.length === 0) return ['  (?.?)  '];
+  const body = frames[frame % frames.length]!.map(line =>
+    line.replaceAll('{E}', bones.eye)
+  );
+  const lines = [...body];
+  // Prepend hat line if companion has a hat
+  if (bones.hat !== 'none') {
+    lines.unshift(HAT_LINES[bones.hat]);
+  }
+  return lines;
+}
+
+export function renderFace(bones: CompanionBones): string {
+  const e = bones.eye;
+  switch (bones.species) {
+    case 'Duck': case 'Goose': return `(${e}>`;
+    case 'Blob': return `(${e}${e})`;
+    case 'Void Cat': return `=${e}w${e}=`;
+    case 'Data Drake': return `<${e}~${e}>`;
+    case 'Octopus': return `~(${e}${e})~`;
+    case 'Owl': return `(${e})(${e})`;
+    case 'Penguin': return `(${e}>)`;
+    case 'Shell Turtle': return `[${e}_${e}]`;
+    case 'Snail': return `${e}(@)`;
+    case 'Ghost': return `/${e}${e}\\`;
+    case 'Axolotl': return `}${e}.${e}{`;
+    case 'Capybara': return `(${e}oo${e})`;
+    case 'Cactus': return `|${e}  ${e}|`;
+    case 'Robot': return `[${e}${e}]`;
+    case 'Rabbit': return `(${e}..${e})`;
+    case 'Mushroom': return `|${e}  ${e}|`;
+    case 'Chonk': return `(${e}.${e})`;
+    case 'Rust Hound': return `/${e} ${e}\\`;
+    case 'Log Golem': return `[${e} ${e}]`;
+    case 'Cache Crow': return `(${e}V${e})`;
+    default: return `(${e}_${e})`;
+  }
+}
+
+export function spriteFrameCount(species: string): number {
+  return SPRITE_BODIES[species]?.length ?? 1;
 }

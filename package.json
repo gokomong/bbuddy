@@ -1,11 +1,12 @@
 {
   "name": "@fiorastudio/buddy",
   "version": "1.0.0",
-  "description": "",
+  "description": "Persistent AI coding companion - MCP server with 21 species, personality stats, and code feedback",
   "main": "dist/server/index.js",
   "bin": {
-    "buddy-mcp": "dist/server/index.js"
+    "buddy-statusline": "dist/statusline-wrapper.js"
   },
+  "files": ["dist", "README.md", "LICENSE"],
   "type": "module",
   "scripts": {
     "build": "tsc",
@@ -17,8 +18,7 @@
   "license": "ISC",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "better-sqlite3": "^12.8.0",
-    "zod": "^4.3.6"
+    "better-sqlite3": "^12.8.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
