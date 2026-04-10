@@ -25,22 +25,9 @@ Buddy is the open-source, **agent-agnostic** rescue mission for the terminal com
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-```
-  🥚 → ✨ → 🐾
-
-       (   )                    .________________________________.
-     .-o-OO-o-.                 | Solid pattern choice.          |  -    (   )
-    (__________)                '________________________________'    .-o-OO-o-.
-       |.  .|                                                       (__________)
-       |____|                      ♥    ♥                              |.  .|
-                                  ♥  ♥   ♥                             |____|
-     Nuzzlecap                   ♥   ♥  ♥                            Nuzzlecap
-   ★★ UNCOMMON                      (   )
-                                  .-o-OO-o-.           Nuzzlecap: *spores of contentment*
-   SNARK █████▓░░  70            (__________)
-   PATIENCE ██▓░░  34              |.  .|
-                                   |____|            Your buddy is here to stay. 🐾
-```
+<p align="center">
+  <img src="demo/buddy-demo.gif" alt="Buddy Demo — Hatch, Observe, Pet" width="620">
+</p>
 
 ## 💔 The Problem
 
