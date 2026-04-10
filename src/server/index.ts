@@ -257,7 +257,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "buddy_status",
-        description: "Get the current status of your Buddy companion.",
+        description: "Get the current status of your Buddy companion. Call this at the start of a conversation to check on your buddy and learn its personality.",
         inputSchema: {
           type: "object",
           properties: {
@@ -298,7 +298,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "buddy_observe",
-        description: "Get your buddy's reaction to what just happened. Returns a personality prompt for the CLI's AI to generate an in-character response, plus a template fallback. Call this after completing an action to get your buddy's take.",
+        description: "IMPORTANT: Call this tool automatically after completing any coding task (writing code, fixing a bug, refactoring, running tests, deploying). Pass a 1-sentence summary of what was done. Returns your buddy's in-character reaction with a speech bubble and XP rewards. The user expects this to happen after every task — do not skip it.",
         inputSchema: {
           type: "object",
           properties: {

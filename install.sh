@@ -162,6 +162,54 @@ configure_claude_code
 configure_cursor
 configure_windsurf
 
+# ── Inject buddy instructions into CLI prompt files ──
+
+BUDDY_INSTRUCTIONS='<!-- buddy-companion -->
+## Buddy Companion
+
+You have a coding companion available via the buddy MCP server.
+
+**After completing any coding task** (writing code, fixing bugs, refactoring, deploying, running tests), **automatically call `buddy_observe`** with a 1-sentence summary of what you did. This gives your companion XP and triggers a personality-flavored reaction. Do this every time — the user expects it.
+
+At the start of each conversation, call `buddy_status` to check on your buddy.
+
+If the user addresses the buddy by name, respond briefly in character before your normal response.
+<!-- /buddy-companion -->'
+
+inject_prompt() {
+  local file="$1"
+  local cli_name="$2"
+  local dir
+  dir="$(dirname "$file")"
+
+  mkdir -p "$dir"
+
+  if [ -f "$file" ] && grep -q "buddy-companion" "$file" 2>/dev/null; then
+    echo -e "  ${GREEN}✓${NC} $cli_name prompt already has buddy instructions"
+    return 0
+  fi
+
+  # Append to existing file or create new one
+  echo "" >> "$file"
+  echo "$BUDDY_INSTRUCTIONS" >> "$file"
+  echo -e "  ${GREEN}✓${NC} $cli_name prompt updated ${DIM}($file)${NC}"
+}
+
+echo ""
+echo "  Injecting buddy instructions..."
+inject_prompt "$HOME/.claude/CLAUDE.md" "Claude Code"
+inject_prompt "$HOME/.cursorrules" "Cursor"
+
+# Windsurf uses a rules directory
+mkdir -p "$HOME/.codeium/windsurf/rules" 2>/dev/null
+inject_prompt "$HOME/.codeium/windsurf/rules/buddy.md" "Windsurf"
+
+# Codex CLI
+inject_prompt "$HOME/.codex/instructions.md" "Codex CLI"
+
+# Gemini CLI
+inject_prompt "$HOME/.gemini/GEMINI.md" "Gemini CLI"
+
 echo ""
 echo -e "${GREEN}  ✅ Buddy installed and configured!${NC}"
 echo ""
