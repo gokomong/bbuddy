@@ -16,6 +16,7 @@ import { type Companion, STAT_NAMES, RARITY_STARS, RARITY_ANSI, SPARKLE_EYE, get
 import { roll, statBar } from "../lib/rng.js";
 import { generateBio } from "../lib/personality.js";
 import { buildObserverPrompt } from "../lib/observer.js";
+import { renderSpeechBubble } from "../lib/bubble.js";
 import { XP_REWARDS, levelFromXp, levelBar, levelProgress } from "../lib/leveling.js";
 import { randomUUID } from "crypto";
 import { writeFileSync, mkdirSync, unlinkSync } from "fs";
@@ -492,8 +493,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       indicator: xpResult.leveledUp ? '✨' : result.reaction.indicator,
     });
 
+    // Render speech bubble with template fallback for immediate visual feedback
+    const art = renderSprite(companion);
+    const bubbleText = xpResult.leveledUp
+      ? `✨ ${companion.name} leveled up to ${xpResult.newLevel}! ✨\n\n${result.templateFallback}`
+      : result.templateFallback;
+    const bubble = renderSpeechBubble(bubbleText, art, companion.name, 34);
+
     return {
       content: [
+        { type: "text", text: bubble },
         {
           type: "text",
           text: JSON.stringify({
