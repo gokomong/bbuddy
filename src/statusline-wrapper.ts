@@ -16,6 +16,9 @@ const toUnix = (p: string) => p.replace(/\\/g, "/");
 const BUDDY_STATUS_PATH = join(homedir(), ".claude", "buddy-status.json");
 const FRAME_INTERVAL_MS = 800;
 
+// True randomness for animation — each render picks a fresh random value.
+// Idle animations SHOULD be unpredictable, like a real creature.
+
 // Strip ANSI codes for width calculation
 const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "");
 
@@ -72,32 +75,34 @@ try {
       const bones = { species: buddy.species, eye: buddy.eye, hat: buddy.hat || 'none', rarity: buddy.rarity || 'common', shiny: buddy.is_shiny || false, stats: buddy.stats || {} } as any;
       const frames = SPRITE_BODIES[buddy.species];
       const totalFrames = frames.length;
-      const tick = Math.floor(Date.now() / FRAME_INTERVAL_MS);
-
-      // Mood-aware frame selection:
-      // Active reaction → cycle through expressive frames (skip idle, favor expressions)
-      // Excited/impressed → fast cycle through all frames
-      // Grumpy/muted → mostly idle with rare blink
-      // Default → normal idle sequence with occasional blink/expression
-      let frameIndex: number;
       const hasReaction = buddy.reaction_expires && Date.now() < buddy.reaction_expires;
 
+      // Organic frame selection — pseudo-random, not fixed timer
+      // Each render picks a frame based on hashed time + buddy name
+      // This makes the buddy feel alive, not mechanical
+      let frameIndex: number;
+      const r = Math.random();
+
       if (hasReaction && (buddy.reaction === 'excited' || buddy.reaction === 'impressed')) {
-        // Energetic: cycle all frames fast
-        frameIndex = tick % totalFrames;
+        // Energetic: any frame, biased toward expressive (1-4)
+        frameIndex = r < 0.3 ? 0 : Math.floor(r * totalFrames);
       } else if (hasReaction && buddy.reaction === 'concerned') {
-        // Worried: alternate between idle and blink rapidly
-        frameIndex = (tick % 2 === 0) ? 0 : 1;
+        // Worried: mostly blink, sometimes idle
+        frameIndex = r < 0.6 ? 1 : 0;
       } else if (hasReaction) {
-        // Other reactions: cycle expressions (skip idle)
-        frameIndex = 1 + (tick % Math.max(1, totalFrames - 1));
+        // Other reactions: expressive frames
+        frameIndex = 1 + Math.floor(r * Math.max(1, totalFrames - 1));
       } else if (buddy.mood === 'grumpy' || buddy.mood === 'muted') {
-        // Grumpy: mostly idle, rare blink (1 in 6)
-        frameIndex = (tick % 6 === 0) ? 1 : 0;
+        // Grumpy: mostly idle, rare blink (~15% chance)
+        frameIndex = r < 0.15 ? 1 : 0;
       } else {
-        // Normal idle: gentle sequence — idle, idle, blink, idle, expression, idle...
-        const idleSequence = [0, 0, 1, 0, 0, 2, 0, 3, 0, 0, 1, 0, 0, 0, 4 % totalFrames];
-        frameIndex = idleSequence[tick % idleSequence.length] % totalFrames;
+        // Normal idle: weighted random
+        // 40% idle, 20% blink, 15% expression, 15% wiggle, 10% special
+        if (r < 0.40) frameIndex = 0;
+        else if (r < 0.60) frameIndex = 1;
+        else if (r < 0.75) frameIndex = 2 % totalFrames;
+        else if (r < 0.90) frameIndex = 3 % totalFrames;
+        else frameIndex = (totalFrames - 1) % totalFrames;
       }
 
       const artLines = renderSprite(bones, frameIndex);
@@ -158,18 +163,17 @@ try {
       }
 
       // --- Micro-expression: append tiny ASCII particle to last art line ---
-      const now = Date.now();
-      const microTick = Math.floor(now / 2000); // changes every 2s
-      const microParticles = ['', '', '~', '', '*', '', '.', '', '♪', '', 'z', '', '·', '', ''];
-      const hasReactionActive = buddy.reaction_expires && now < buddy.reaction_expires;
+      const hasReactionActive = buddy.reaction_expires && Date.now() < buddy.reaction_expires;
+      const microR = Math.random();
+      const microParticles = ['', '', '~', '', '*', '', '.', '♪', '', 'z', '·', ''];
       if (!hasReactionActive) {
-        const particle = microParticles[microTick % microParticles.length];
+        const particle = microParticles[Math.floor(microR * microParticles.length)];
         if (particle && asciiLines.length > 0) {
           asciiLines[asciiLines.length - 1] = asciiLines[asciiLines.length - 1].trimEnd() + ' ' + particle;
         }
       }
 
-      // --- Ambient activity text: rotates every 30s, species-aware ---
+      // --- Ambient activity text: species-aware, changes randomly ~every 15-45s ---
       const speciesAmbient: Record<string, string[]> = {
         'Void Cat': ['· judging your code', '· grooming silently', '· staring into void', '· plotting'],
         'Rust Hound': ['· sniffing for bugs', '· guarding the repo', '· chasing a pointer', '· tail wagging'],
@@ -182,8 +186,8 @@ try {
       };
       const defaultAmbient = ['· watching your cursor', '· counting semicolons', '· sniffing the git log', '· dreaming of v2.0', '· vibing'];
       const ambientPool = speciesAmbient[buddy.species] || defaultAmbient;
-      const ambientIdx = Math.floor(now / 30000) % ambientPool.length;
-      const ambientText = hasReactionActive ? '' : `${DIM}${ambientPool[ambientIdx]}${RESET}`;
+      const ambientR = Math.random();
+      const ambientText = hasReactionActive ? '' : `${DIM}${ambientPool[Math.floor(ambientR * ambientPool.length)]}${RESET}`;
 
       const shinyTag = buddy.is_shiny ? " ✨" : "";
       const rarityColor = buddy.rarity ? (RARITY_ANSI[buddy.rarity as keyof typeof RARITY_ANSI] || DIM) : DIM;
