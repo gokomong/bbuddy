@@ -44,23 +44,99 @@ Buddy MCP fixes all of this:
 - **Full personality** -- 21 species, 5 stats, unique bios, observer feedback loop
 - **Zero extra cost** -- uses your existing AI subscription for chime-in reactions
 
-## Quick Start
+## 🦾 Install
 
-One command. Installs and auto-configures MCP for your CLI.
+One command. Installs Buddy and auto-configures your CLI. No manual config needed.
 
-**Mac / Linux:**
+### macOS / Linux
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/fiorastudio/buddy/master/install.sh | bash
 ```
 
-**Windows (PowerShell):**
+### Windows
+
 ```powershell
 irm https://raw.githubusercontent.com/fiorastudio/buddy/master/install.ps1 | iex
 ```
 
-That's it. The installer clones, builds, and configures **Claude Code**, **Cursor**, and **Windsurf** automatically. No manual config needed.
+### What the installer does
 
-Then just tell your AI: **"hatch a buddy"** and you'll see:
+1. Clones the repo to `~/.buddy/server/`
+2. Installs dependencies and builds
+3. Auto-configures MCP for **Claude Code**, **Cursor**, and **Windsurf**
+4. Prints a success message — you're ready to go
+
+> **Requires:** Node.js 18+ and Git
+
+### Manual install (from source)
+
+```bash
+git clone https://github.com/fiorastudio/buddy.git ~/.buddy/server
+cd ~/.buddy/server
+npm install && npm run build
+```
+
+Then add to your MCP config manually:
+
+<details>
+<summary>Claude Code (~/.claude/settings.json)</summary>
+
+```json
+{
+  "mcpServers": {
+    "buddy": {
+      "command": "node",
+      "args": ["~/.buddy/server/dist/server/index.js"]
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary>Cursor (~/.cursor/mcp.json)</summary>
+
+```json
+{
+  "mcpServers": {
+    "buddy": {
+      "command": "node",
+      "args": ["~/.buddy/server/dist/server/index.js"]
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary>Windsurf (~/.codeium/windsurf/mcp_config.json)</summary>
+
+```json
+{
+  "mcpServers": {
+    "buddy": {
+      "command": "node",
+      "args": ["~/.buddy/server/dist/server/index.js"]
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary>Any other MCP client</summary>
+
+Same pattern — point `command` to `node` and `args` to the server entry point at `~/.buddy/server/dist/server/index.js`.
+</details>
+
+---
+
+### 🥚 Hatch your buddy
+
+Open your AI terminal and say: **"hatch a buddy"**
+
+You'll see:
 
 ```
   An egg appears...
