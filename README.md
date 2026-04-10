@@ -46,35 +46,21 @@ Buddy MCP fixes all of this:
 
 ## Quick Start
 
-### 1. Install
+One command. Installs and auto-configures MCP for your CLI.
 
+**Mac / Linux:**
 ```bash
-# Clone and build
-git clone https://github.com/fiorastudio/buddy.git
-cd buddy
-npm install
-npm run build
+curl -fsSL https://raw.githubusercontent.com/fiorastudio/buddy/master/install.sh | bash
 ```
 
-### 2. Add to your MCP config
-
-**Claude Code** (`~/.claude/settings.json`):
-```json
-{
-  "mcpServers": {
-    "buddy": {
-      "command": "node",
-      "args": ["/absolute/path/to/buddy/dist/server/index.js"]
-    }
-  }
-}
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/fiorastudio/buddy/master/install.ps1 | iex
 ```
 
-**Any other MCP-compatible CLI** -- same pattern. Point `command` to `node` and `args` to the server entry point.
+That's it. The installer clones, builds, and configures **Claude Code**, **Cursor**, and **Windsurf** automatically. No manual config needed.
 
-### 3. Hatch your buddy
-
-Just tell your AI to hatch a buddy. It will call `buddy_hatch` and you'll see:
+Then just tell your AI: **"hatch a buddy"** and you'll see:
 
 ```
   An egg appears...
@@ -331,10 +317,12 @@ Buddy reactions render as speech bubbles next to your companion's ASCII art:
 ## 🛠️ Development
 
 ```bash
+git clone https://github.com/fiorastudio/buddy.git
+cd buddy
 npm install
 npm run build
+npm test           # 243 tests
 npm start          # runs the MCP server on stdio
-npm run dev        # development mode with ts-node
 ```
 
 ## 🔍 Find Us
