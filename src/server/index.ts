@@ -332,7 +332,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const finalName = requestedName || generateName(finalSpecies);
     const id = Math.random().toString(36).substring(7);
 
-    const bio = generateBio(bones);
+    // Use finalSpecies for bio (bones.species may differ if user overrode species)
+    const bio = generateBio({ ...bones, species: finalSpecies });
 
     db.prepare(
       "INSERT INTO companions (id, name, species, user_id, personality_bio) VALUES (?, ?, ?, ?, ?)"
