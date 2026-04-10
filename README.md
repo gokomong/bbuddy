@@ -136,11 +136,11 @@ Every buddy is one of 21 species, each with their own ASCII art, animations, and
 ### 5 Personality Stats
 
 ```
-DEBUGGING  ████████   92
+DEBUGGING  ███████▓   92
 PATIENCE   ██▓░░░░░   28
 CHAOS      █████░░░   60
 WISDOM     ██████▓░   78
-SNARK      ███████░   85
+SNARK      ██████▓░   85
 ```
 
 Every buddy gets a unique stat distribution based on their rarity roll. Stats shape their personality:
@@ -208,6 +208,63 @@ buddy_remember  ->  SQLite  ->  buddy_status
                                '________________________'
 ```
 
+### XP & Leveling
+
+Your buddy gains experience as you code together:
+
+| Event | XP |
+|---|---|
+| Code observation (`buddy_observe`) | +2 |
+| Commit | +5 |
+| Bug fix | +8 |
+| Deploy/ship | +15 |
+| Petting (`buddy_pet`) | +1 |
+
+The XP curve is exponential -- early levels come fast, but reaching max level (50) takes serious dedication:
+
+```
+Lv.1 → Lv.2:    45 XP
+Lv.5 → Lv.6:    ~310 XP
+Lv.10 → Lv.11:  ~1,584 XP
+Lv.25 → Lv.26:  ~13,222 XP
+Lv.49 → Lv.50:  ~62,946 XP
+```
+
+When your buddy levels up, their eyes briefly turn to ✦ sparkle eyes for 15 seconds. You'll know.
+
+Level progress shows on the status card:
+```
+| Lv.3 · 42/112 XP to next               |
+```
+
+### Statusline Integration
+
+For Claude Code users, Buddy renders in your statusline alongside the HUD:
+
+```
+ .-o-OO-o-.  Nuzzlecap (Mushroom) Lv.3
+(__________)  happy XP:157 ★★
+   |.  .|     · spreading spores
+   |____|  ~
+```
+
+Features:
+- **Random animations** -- blinks, wiggles, expressions change on every render
+- **Ambient activity** -- species-specific idle text ("· spreading spores", "· judging your code")
+- **Micro-expressions** -- tiny particles (`~`, `*`, `♪`, `z`) appear and disappear
+- **Reaction states** -- eyes change when the observer fires (✦ impressed, × concerned, ◉ excited)
+- **Mood-aware** -- grumpy buddies barely move, excited ones cycle through all frames
+
+Add the statusline wrapper to your Claude Code settings:
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "bun /path/to/buddy/src/statusline-wrapper.ts"
+  }
+}
+```
+
 ### Speech Bubbles
 
 Buddy reactions render as speech bubbles next to your companion's ASCII art:
@@ -230,6 +287,7 @@ Buddy reactions render as speech bubbles next to your companion's ASCII art:
 | `buddy_observe` | Get your buddy's reaction to what you just did. Modes: backseat, skillcoach, both. |
 | `buddy_pet` | Pet your buddy. Hearts appear. It's important. |
 | `buddy_remember` | Store a memory for your buddy. |
+| `buddy_dream` | Trigger memory consolidation (light or deep). |
 | `buddy_mute` | Mute your buddy's chime-ins. |
 | `buddy_unmute` | Bring your buddy back. |
 | `buddy_respawn` | Release your buddy and start fresh. |
