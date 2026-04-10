@@ -43,12 +43,54 @@ function loadCompanion(row: any, userIdOverride?: string): Companion | null {
   };
 }
 
-function hatchAnimation(companion: Companion): string {
-  const stars = RARITY_STARS[companion.rarity];
+function renderCard(companion: Companion): string {
   const art = renderSprite(companion);
-  const shinyTag = companion.shiny ? ' ✨ SHINY ✨' : '';
+  const stars = RARITY_STARS[companion.rarity];
   const statLines = STAT_NAMES.map(s => statBar(s, companion.stats[s]));
 
+  const cardWidth = 44;
+  const inner = cardWidth - 4;
+  const topBorder = '.' + '_'.repeat(cardWidth - 2) + '.';
+  const bottomBorder = "'" + '_'.repeat(cardWidth - 2) + "'";
+  const emptyLine = '| ' + ' '.repeat(inner) + ' |';
+  const ln = (text: string) => '| ' + text.padEnd(inner) + ' |';
+
+  const headerLeft = `${stars} ${companion.rarity.toUpperCase()}`;
+  const headerRight = companion.species.toUpperCase();
+  const headerGap = inner - headerLeft.length - headerRight.length;
+  const headerLine = ln(headerLeft + ' '.repeat(Math.max(1, headerGap)) + headerRight);
+
+  const bioLines: string[] = [];
+  if (companion.personalityBio) {
+    const bioText = `"${companion.personalityBio}"`;
+    const words = bioText.split(' ');
+    let cur = '';
+    for (const w of words) {
+      if (cur.length + w.length + 1 > inner - 2 && cur) {
+        bioLines.push(ln(' ' + cur));
+        cur = w;
+      } else {
+        cur = cur ? `${cur} ${w}` : w;
+      }
+    }
+    if (cur) bioLines.push(ln(' ' + cur));
+  }
+
+  return [
+    topBorder,
+    headerLine,
+    emptyLine,
+    ...art.map(l => ln(l)),
+    emptyLine,
+    ln(companion.name),
+    ...(bioLines.length > 0 ? [emptyLine, ...bioLines] : []),
+    emptyLine,
+    ...statLines.map(l => ln(l)),
+    bottomBorder,
+  ].join('\n');
+}
+
+function hatchAnimation(companion: Companion): string {
   const egg1 = [
     '        ',
     '   .--. ',
@@ -85,6 +127,7 @@ function hatchAnimation(companion: Companion): string {
     "    `´    ",
   ].join('\n');
 
+  const art = renderSprite(companion);
   const hatched = [
     '  ·  ✦  · ',
     ' ✦ ·  · ✦ ',
@@ -93,21 +136,14 @@ function hatchAnimation(companion: Companion): string {
     '  ·  ✦  · ',
   ].join('\n');
 
-  const card = [
-    '╔══════════════════════════════════════╗',
-    `║  ${stars} ${companion.rarity.toUpperCase()}${shinyTag}`.padEnd(39) + '║',
-    `║  ${companion.species}`.padEnd(39) + '║',
-    '╠══════════════════════════════════════╣',
-    '║' + ' '.repeat(38) + '║',
-    ...art.map(l => '║  ' + l.padEnd(36) + '║'),
-    '║' + ' '.repeat(38) + '║',
-    `║  ${companion.name}`.padEnd(39) + '║',
-    companion.personalityBio ? `║  "${companion.personalityBio}"`.padEnd(39) + '║' : null,
-    '║' + ' '.repeat(38) + '║',
-    ...statLines.map(l => '║  ' + l.padEnd(36) + '║'),
-    '║' + ' '.repeat(38) + '║',
-    '╚══════════════════════════════════════╝',
-  ].filter(Boolean).join('\n');
+  const card = renderCard(companion);
+
+  const footer = [
+    '',
+    `${companion.name} is here · it'll chime in as you code`,
+    `uses the same AI subscription you're on`,
+    `say its name to get its take · /buddy pet · /buddy off`,
+  ].join('\n');
 
   return [
     '🥚 An egg appears...\n',
@@ -122,6 +158,7 @@ function hatchAnimation(companion: Companion): string {
     hatched,
     '\n',
     card,
+    footer,
   ].join('\n');
 }
 
@@ -329,23 +366,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     const companion = loadCompanion({ ...row, mood: newMood }, userId)!;
 
-    const art = renderSprite(companion);
-    const stars = RARITY_STARS[companion.rarity];
-    const shinyTag = companion.shiny ? ' ✨' : '';
-    const statLines = STAT_NAMES.map(s => statBar(s, companion.stats[s]));
-
-    const statusCard = [
-      `${stars} ${companion.rarity.toUpperCase()}${shinyTag}  ${companion.species}`,
-      '',
-      ...art,
-      '',
-      `${companion.name}`,
-      companion.personalityBio ? `"${companion.personalityBio}"` : '',
-      '',
-      ...statLines,
-      '',
-      `Level: ${companion.level}  XP: ${companion.xp}  Mood: ${companion.mood}`,
-    ].filter(Boolean).join('\n');
+    const statusCard = renderCard(companion);
 
     writeBuddyStatus(companion);
 
