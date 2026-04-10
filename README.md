@@ -42,6 +42,10 @@ Buddy is the open-source, **agent-agnostic** rescue mission for the terminal com
                                |____|         Your buddy is here to stay. 🐾
 ```
 
+<p align="center">
+  <img src="demo/buddy-demo.gif" alt="Buddy Demo — Hatch, Observe, Pet" width="620">
+</p>
+
 ## 💔 The Problem
 
 People love the Claude Code `/buddy` feature. Like, *really* love it. So much that [they refuse to close their terminals](https://github.com/anthropics/claude-code/issues/45596) because they don't want to lose their companion. That's not a feature request -- that's separation anxiety.
