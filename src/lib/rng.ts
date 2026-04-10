@@ -105,8 +105,12 @@ export function rollWithSeed(seed: string, speciesList: readonly string[]): Roll
 }
 
 export function statBar(name: string, value: number): string {
-  const filled = Math.round(value / 10);
-  const empty = 10 - filled;
-  const bar = '█'.repeat(filled) + '░'.repeat(empty);
-  return `${name.padEnd(10)} [${bar}] ${value}`;
+  const totalBlocks = 8;
+  const filled = (value / 100) * totalBlocks;
+  const fullBlocks = Math.floor(filled);
+  const remainder = filled - fullBlocks;
+  const hasPartial = remainder >= 0.25 && fullBlocks < totalBlocks;
+  const emptyBlocks = totalBlocks - fullBlocks - (hasPartial ? 1 : 0);
+  const bar = '█'.repeat(fullBlocks) + (hasPartial ? '▓' : '') + '░'.repeat(emptyBlocks);
+  return `${name.padEnd(10)} ${bar}   ${String(value).padStart(2)}`;
 }
