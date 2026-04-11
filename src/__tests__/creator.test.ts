@@ -98,19 +98,20 @@ describe('evaluateWizardState', () => {
   });
 
   it('returns step=species when name is set but species missing', () => {
-    const state = evaluateWizardState({ name: 'Mochi' });
+    const state = evaluateWizardState({ name: 'Mochi', appearance_mode: '1' });
     expect(state.step).toBe('species');
     expect(state.completed).toContain('name');
   });
 
   it('returns step=personality when name+species set', () => {
-    const state = evaluateWizardState({ name: 'Mochi', species: 'Void Cat' });
+    const state = evaluateWizardState({ name: 'Mochi', appearance_mode: '1', species: 'Void Cat' });
     expect(state.step).toBe('personality');
   });
 
   it('returns step=stats when name+species+personality set', () => {
     const state = evaluateWizardState({
       name: 'Mochi',
+      appearance_mode: '1',
       species: 'Void Cat',
       personality_preset: 'tsundere',
     });
@@ -120,6 +121,7 @@ describe('evaluateWizardState', () => {
   it('returns step=ready when all fields are valid', () => {
     const state = evaluateWizardState({
       name: 'Mochi',
+      appearance_mode: '1',
       species: 'Void Cat',
       personality_preset: 'tsundere',
       stats: { DEBUGGING: 40, PATIENCE: 25, CHAOS: 10, WISDOM: 15, SNARK: 10 },
@@ -131,6 +133,7 @@ describe('evaluateWizardState', () => {
   it('returns step=personality when custom preset has no custom_prompt', () => {
     const state = evaluateWizardState({
       name: 'Mochi',
+      appearance_mode: '1',
       species: 'Void Cat',
       personality_preset: 'custom',
       // custom_prompt missing
@@ -141,6 +144,7 @@ describe('evaluateWizardState', () => {
   it('returns step=ready when custom preset has custom_prompt', () => {
     const state = evaluateWizardState({
       name: 'Mochi',
+      appearance_mode: '1',
       species: 'Void Cat',
       personality_preset: 'custom',
       custom_prompt: 'Very grumpy.',
@@ -152,6 +156,7 @@ describe('evaluateWizardState', () => {
   it('returns step=stats when stats do not sum to 100', () => {
     const state = evaluateWizardState({
       name: 'Mochi',
+      appearance_mode: '1',
       species: 'Void Cat',
       personality_preset: 'tsundere',
       stats: { DEBUGGING: 10, PATIENCE: 10, CHAOS: 10, WISDOM: 10, SNARK: 10 },
@@ -160,7 +165,7 @@ describe('evaluateWizardState', () => {
   });
 
   it('rejects invalid species', () => {
-    const state = evaluateWizardState({ name: 'Mochi', species: 'FakeSpecies' });
+    const state = evaluateWizardState({ name: 'Mochi', appearance_mode: '1', species: 'FakeSpecies' });
     expect(state.step).toBe('species');
   });
 });

@@ -71,6 +71,17 @@ export function initDb() {
       context_summary TEXT,
       FOREIGN KEY(companion_id) REFERENCES companions(id)
     );
+
+    CREATE TABLE IF NOT EXISTS custom_sprites (
+      companion_id  TEXT PRIMARY KEY,
+      idle_frames   TEXT NOT NULL,
+      happy_frame   TEXT,
+      sad_frame     TEXT,
+      working_frame TEXT,
+      created_at    TEXT DEFAULT (datetime('now')),
+      updated_at    TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(companion_id) REFERENCES companions(id)
+    );
   `);
 
   // bbddy schema migrations — safe to run on existing DBs

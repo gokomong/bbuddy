@@ -18,9 +18,12 @@ import { generateBio } from "../lib/personality.js";
 import { buildObserverPrompt } from "../lib/observer.js";
 import { renderSpeechBubble } from "../lib/bubble.js";
 import { XP_REWARDS, levelFromXp, levelBar, levelProgress } from "../lib/leveling.js";
-import { evaluateWizardState, renderWizardPrompt, renderPreviewText, type WizardArgs } from "../creator/index.js";
+import { evaluateWizardState, renderWizardPrompt, renderPreviewText, type WizardArgs, type CustomSprite } from "../creator/index.js";
 import { generatePresetBio, PRESETS } from "../creator/presets.js";
 import { validateStatDistribution, normaliseStats } from "../creator/stats.js";
+import { combineParts, type PartsSelection } from "../creator/parts-combiner.js";
+import { parseManualInput } from "../creator/manual-input.js";
+import { generateAsciiArt } from "../creator/ai-generator.js";
 import { randomUUID } from "crypto";
 import { writeFileSync, mkdirSync, unlinkSync } from "fs";
 import { join } from "path";
@@ -144,7 +147,7 @@ function renderCard(companion: Companion): string {
   ].join('\n');
 }
 
-function hatchAnimation(companion: Companion): string {
+function hatchAnimation(companion: Companion, customFrames?: string[]): string {
   const egg1 = [
     '        ',
     '   .--. ',
@@ -181,7 +184,7 @@ function hatchAnimation(companion: Companion): string {
     "    `´    ",
   ].join('\n');
 
-  const art = renderSprite(companion);
+  const art = customFrames ?? renderSprite(companion);
   const hatched = [
     '  ·  ✦  · ',
     ' ✦ ·  · ✦ ',
@@ -216,12 +219,28 @@ function hatchAnimation(companion: Companion): string {
   ].join('\n');
 }
 
-function writeBuddyStatus(companion: Companion, reaction?: { state: string; text: string; expires: number; eyeOverride?: string; indicator?: string }) {
+function writeBuddyStatus(
+  companion: Companion,
+  reaction?: { state: string; text: string; expires: number; eyeOverride?: string; indicator?: string },
+  companionId?: string,
+) {
   try {
     if (!statusDirEnsured) {
       mkdirSync(join(homedir(), ".claude"), { recursive: true });
       statusDirEnsured = true;
     }
+
+    // Load custom sprite frames if available
+    let customIdleFrames: string[][] | undefined;
+    if (companion.creationMode === 'created' && companionId) {
+      const spriteRow = db.prepare(
+        "SELECT idle_frames FROM custom_sprites WHERE companion_id = ?"
+      ).get(companionId) as any;
+      if (spriteRow?.idle_frames) {
+        try { customIdleFrames = JSON.parse(spriteRow.idle_frames); } catch { /* ignore */ }
+      }
+    }
+
     writeFileSync(BUDDY_STATUS_PATH, JSON.stringify({
       name: companion.name,
       species: companion.species,
@@ -235,6 +254,7 @@ function writeBuddyStatus(companion: Companion, reaction?: { state: string; text
       stats: companion.stats,
       rarity_stars: RARITY_STARS[companion.rarity],
       personality_bio: companion.personalityBio,
+      ...(customIdleFrames ? { custom_idle_frames: customIdleFrames } : {}),
       ...(reaction ? {
         reaction: reaction.state,
         reaction_text: reaction.text,
@@ -270,34 +290,33 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: "bbddy_create",
-        description: "Create a custom bbddy companion through a 4-step wizard (name → species → personality → stats). Provide all parameters at once, or provide partial parameters to get guided prompts for the remaining steps. Set confirm: true once all parameters are ready to finalize creation.",
+        description: "Create a custom bbddy companion through a wizard (name → appearance → personality → stats). Choose appearance_mode: '1'=pick species, '2'=combine parts, '3'=AI generation, '4'=manual typing. Provide partial params to get guided prompts. Set confirm: true to finalize.",
         inputSchema: {
           type: "object",
           properties: {
             name: { type: "string", description: "Your companion's name." },
-            species: {
-              type: "string",
-              enum: [...SPECIES_LIST],
-              description: "Species (appearance template). Choose from the 21 available species.",
+            appearance_mode: { type: "string", enum: ["1","2","3","4"], description: "Appearance mode: 1=species, 2=parts, 3=AI, 4=manual." },
+            species: { type: "string", enum: [...SPECIES_LIST], description: "Mode 1: species to use as appearance." },
+            parts: {
+              type: "object",
+              description: "Mode 2: parts selection. face: round/square/pointy/blob. eye: any char. accessory: none/hat/crown/horns/ears/halo/antenna/bow. body: none/arms/tiny/legs/tail/float.",
+              properties: {
+                face: { type: "string" }, eye: { type: "string" },
+                accessory: { type: "string" }, body: { type: "string" },
+              },
             },
-            personality_preset: {
-              type: "string",
-              enum: [...PERSONALITY_PRESETS],
-              description: "Personality archetype: tsundere, passionate, cold, prankster, sage, or custom.",
-            },
-            custom_prompt: {
-              type: "string",
-              description: "Custom personality description (required when personality_preset is 'custom').",
-            },
+            ai_prompt: { type: "string", description: "Mode 3: character description for AI ASCII generation. Requires ANTHROPIC_API_KEY env var." },
+            manual_frame1: { type: "string", description: "Mode 4: sprite lines separated by \\n (required, max 6 lines × 14 chars)." },
+            manual_frame2: { type: "string", description: "Mode 4: frame 2 (optional, auto-generated if omitted)." },
+            manual_frame3: { type: "string", description: "Mode 4: frame 3 (optional, auto-generated if omitted)." },
+            personality_preset: { type: "string", enum: [...PERSONALITY_PRESETS], description: "Personality: tsundere/passionate/cold/prankster/sage/custom." },
+            custom_prompt: { type: "string", description: "Required when personality_preset is 'custom'." },
             stats: {
               type: "object",
-              description: `Stat distribution. Must sum to 100, each value 1–80. Stats: ${STAT_NAMES.join(', ')}.`,
+              description: `Stat distribution summing to 100 (each 1–80). Stats: ${STAT_NAMES.join(', ')}.`,
               properties: Object.fromEntries(STAT_NAMES.map(n => [n, { type: "number" }])),
             },
-            confirm: {
-              type: "boolean",
-              description: "Set to true to finalize creation after reviewing the preview.",
-            },
+            confirm: { type: "boolean", description: "Set true to finalize after previewing." },
           },
         },
       },
@@ -395,6 +414,25 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         name: "bbddy_unmute",
         description: "Unmute your bbddy so it can chime in again.",
         inputSchema: { type: "object", properties: {} },
+      },
+      {
+        name: "bbddy_evolve",
+        description: "Change the appearance of your existing bbddy companion. Supports the same 4 modes as bbddy_create: 1=pick species, 2=parts, 3=AI generation, 4=manual. Set confirm: true to apply.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            appearance_mode: { type: "string", enum: ["1","2","3","4"], description: "Appearance mode." },
+            species: { type: "string", enum: [...SPECIES_LIST], description: "Mode 1: new species." },
+            parts: { type: "object", description: "Mode 2: parts selection (face/eye/accessory/body).",
+              properties: { face: { type: "string" }, eye: { type: "string" }, accessory: { type: "string" }, body: { type: "string" } },
+            },
+            ai_prompt: { type: "string", description: "Mode 3: description for AI ASCII generation." },
+            manual_frame1: { type: "string", description: "Mode 4: frame 1 lines (\\n separated)." },
+            manual_frame2: { type: "string", description: "Mode 4: frame 2 (optional)." },
+            manual_frame3: { type: "string", description: "Mode 4: frame 3 (optional)." },
+            confirm: { type: "boolean", description: "Set true to apply the new appearance." },
+          },
+        },
       },
     ],
   };
@@ -510,6 +548,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const oldSpecies = companion.species;
 
     // Clear all related data
+    db.prepare("DELETE FROM custom_sprites WHERE companion_id = ?").run(companion.id);
     db.prepare("DELETE FROM sessions WHERE companion_id = ?").run(companion.id);
     db.prepare("DELETE FROM evolution_history WHERE companion_id = ?").run(companion.id);
     db.prepare("DELETE FROM xp_events WHERE companion_id = ?").run(companion.id);
@@ -666,12 +705,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const wizardArgs = args as WizardArgs;
     const state = evaluateWizardState(wizardArgs);
 
-    // Incomplete — show wizard prompt for the current step
+    // Incomplete — show wizard prompt for current step
     if (state.step !== 'ready') {
       return { content: [{ type: "text", text: renderWizardPrompt(state, wizardArgs) }] };
     }
 
-    // All fields present — validate stats
+    // Validate stats
     const statsRaw = wizardArgs.stats as Record<string, number>;
     const statsCheck = validateStatDistribution(statsRaw);
     if (!statsCheck.valid) {
@@ -679,13 +718,47 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
     const stats = normaliseStats(statsRaw);
 
+    // Resolve appearance by mode
+    const mode = wizardArgs.appearance_mode!;
+    let speciesForDb = wizardArgs.species ?? 'Custom';
+    let customSprite: CustomSprite | null = null;
+
+    if (mode === '2' && wizardArgs.parts) {
+      customSprite = combineParts(wizardArgs.parts as PartsSelection);
+      speciesForDb = 'Custom';
+    } else if (mode === '3') {
+      if ((wizardArgs as any).ai_result) {
+        customSprite = (wizardArgs as any).ai_result as CustomSprite;
+        speciesForDb = 'Custom';
+      } else {
+        const apiKey = process.env['ANTHROPIC_API_KEY'];
+        if (!apiKey) {
+          return { content: [{ type: "text", text: "⚠ ANTHROPIC_API_KEY 환경변수가 없습니다. 모드 1/2/4를 사용하거나 API key를 설정하세요." }] };
+        }
+        const result = await generateAsciiArt({ prompt: wizardArgs.ai_prompt! }, apiKey);
+        if (!result) {
+          return { content: [{ type: "text", text: "⚠ AI ASCII 생성 실패. 다시 시도하거나 다른 모드를 사용하세요." }] };
+        }
+        customSprite = result;
+        speciesForDb = 'Custom';
+      }
+    } else if (mode === '4' && wizardArgs.manual_frame1) {
+      customSprite = parseManualInput({
+        frame1: wizardArgs.manual_frame1,
+        frame2: wizardArgs.manual_frame2,
+        frame3: wizardArgs.manual_frame3,
+      });
+      speciesForDb = 'Custom';
+    }
+
     const preset = wizardArgs.personality_preset as typeof PERSONALITY_PRESETS[number];
-    const bio = generatePresetBio(preset, wizardArgs.name!, wizardArgs.species!, stats, wizardArgs.custom_prompt);
+    const speciesForBio = SPECIES_LIST.includes(speciesForDb as any) ? speciesForDb : 'custom character';
+    const bio = generatePresetBio(preset, wizardArgs.name!, speciesForBio, stats, wizardArgs.custom_prompt);
     const presetLabel = PRESETS[preset].label;
 
-    // Show preview if not yet confirmed
+    // Show preview if not confirmed
     if (!wizardArgs.confirm) {
-      const preview = renderPreviewText(wizardArgs.name!, wizardArgs.species!, presetLabel, bio, stats);
+      const preview = renderPreviewText(wizardArgs.name!, speciesForDb, presetLabel, bio, stats, customSprite?.idleFrames[0]);
       return {
         content: [{
           type: "text",
@@ -697,9 +770,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // Confirmed — check no existing companion
     const existing = db.prepare("SELECT id FROM companions LIMIT 1").get() as any;
     if (existing) {
-      return {
-        content: [{ type: "text", text: "이미 companion이 있습니다. bbddy_respawn으로 해제한 뒤 다시 시도하세요." }],
-      };
+      return { content: [{ type: "text", text: "이미 companion이 있습니다. bbddy_respawn으로 해제한 뒤 다시 시도하세요." }] };
     }
 
     const id = randomUUID();
@@ -707,44 +778,108 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       `INSERT INTO companions
         (id, name, species, user_id, personality_bio, creation_mode, personality_preset, custom_prompt, stats_mode, rarity, eye, hat, stats_json)
        VALUES (?, ?, ?, ?, ?, 'created', ?, ?, 'manual', 'uncommon', '·', 'none', ?)`
-    ).run(
-      id,
-      wizardArgs.name!,
-      wizardArgs.species!,
-      'created-' + id,
-      bio,
-      preset,
-      wizardArgs.custom_prompt || null,
-      JSON.stringify(stats),
-    );
+    ).run(id, wizardArgs.name!, speciesForDb, 'created-' + id, bio, preset, wizardArgs.custom_prompt || null, JSON.stringify(stats));
+
+    // Save custom sprite if present
+    if (customSprite) {
+      db.prepare(
+        `INSERT OR REPLACE INTO custom_sprites (companion_id, idle_frames, happy_frame, sad_frame, working_frame)
+         VALUES (?, ?, ?, ?, ?)`
+      ).run(id, JSON.stringify(customSprite.idleFrames), JSON.stringify(customSprite.happyFrame), JSON.stringify(customSprite.sadFrame), JSON.stringify(customSprite.workingFrame));
+    }
 
     const companion: Companion = {
-      rarity: 'uncommon',
-      species: wizardArgs.species!,
-      eye: '·',
-      hat: 'none',
-      shiny: false,
-      stats,
-      name: wizardArgs.name!,
-      personalityBio: bio,
-      level: 1,
-      xp: 0,
-      mood: 'happy',
-      hatchedAt: Date.now(),
-      creationMode: 'created',
-      personalityPreset: preset,
-      customPrompt: wizardArgs.custom_prompt,
-      statsMode: 'manual',
+      rarity: 'uncommon', species: speciesForDb, eye: '·', hat: 'none', shiny: false, stats,
+      name: wizardArgs.name!, personalityBio: bio, level: 1, xp: 0, mood: 'happy',
+      hatchedAt: Date.now(), creationMode: 'created', personalityPreset: preset,
+      customPrompt: wizardArgs.custom_prompt, statsMode: 'manual',
     };
 
-    writeBuddyStatus(companion);
+    writeBuddyStatus(companion, undefined, id);
+    const reactionSpecies = SPECIES_LIST.includes(speciesForDb as any) ? speciesForDb : 'Blob';
 
     return {
       content: [
-        { type: "text", text: hatchAnimation(companion) },
-        { type: "text", text: getReaction(companion.species, 'hatch', 'happy') },
+        { type: "text", text: hatchAnimation(companion, customSprite?.idleFrames[0]) },
+        { type: "text", text: getReaction(reactionSpecies, 'hatch', 'happy') },
       ],
     };
+  }
+
+  if (name === "bbddy_evolve") {
+    const row = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
+    if (!row) {
+      return { content: [{ type: "text", text: "No companion found. Use bbddy_hatch or bbddy_create first." }] };
+    }
+
+    const evolveArgs = args as WizardArgs;
+    const mode = evolveArgs.appearance_mode;
+    if (!mode) {
+      return { content: [{ type: "text", text: renderWizardPrompt({ step: 'appearance_mode', completed: ['name'], missing: ['appearance_mode'] }, { name: row.name }) }] };
+    }
+
+    // Build new custom sprite
+    let newSpecies = row.species as string;
+    let newCustomSprite: CustomSprite | null = null;
+
+    if (mode === '1') {
+      if (!evolveArgs.species || !SPECIES_LIST.includes(evolveArgs.species as any)) {
+        return { content: [{ type: "text", text: renderWizardPrompt({ step: 'species', completed: ['name','appearance_mode'], missing: ['species'] }, { ...evolveArgs, name: row.name }) }] };
+      }
+      newSpecies = evolveArgs.species;
+    } else if (mode === '2') {
+      const p = evolveArgs.parts;
+      if (!p?.face || !p?.eye || !p?.accessory || !p?.body) {
+        return { content: [{ type: "text", text: renderWizardPrompt({ step: 'parts', completed: ['name','appearance_mode'], missing: ['parts'] }, { ...evolveArgs, name: row.name }) }] };
+      }
+      newCustomSprite = combineParts(p as PartsSelection);
+      newSpecies = 'Custom';
+    } else if (mode === '3') {
+      if (!evolveArgs.ai_prompt) {
+        return { content: [{ type: "text", text: renderWizardPrompt({ step: 'ai_prompt', completed: ['name','appearance_mode'], missing: ['ai_prompt'] }, { ...evolveArgs, name: row.name }) }] };
+      }
+      const apiKey = process.env['ANTHROPIC_API_KEY'];
+      if (!apiKey) {
+        return { content: [{ type: "text", text: "⚠ ANTHROPIC_API_KEY 환경변수가 없습니다." }] };
+      }
+      const result = await generateAsciiArt({ prompt: evolveArgs.ai_prompt }, apiKey);
+      if (!result) {
+        return { content: [{ type: "text", text: "⚠ AI ASCII 생성 실패. 다시 시도하세요." }] };
+      }
+      newCustomSprite = result;
+      newSpecies = 'Custom';
+    } else if (mode === '4') {
+      if (!evolveArgs.manual_frame1) {
+        return { content: [{ type: "text", text: renderWizardPrompt({ step: 'manual', completed: ['name','appearance_mode'], missing: ['manual'] }, { ...evolveArgs, name: row.name }) }] };
+      }
+      newCustomSprite = parseManualInput({ frame1: evolveArgs.manual_frame1, frame2: evolveArgs.manual_frame2, frame3: evolveArgs.manual_frame3 });
+      newSpecies = 'Custom';
+    }
+
+    // Preview if not confirmed
+    if (!evolveArgs.confirm) {
+      const previewFrame = newCustomSprite?.idleFrames[0];
+      const previewLines = previewFrame ? previewFrame.join('\n') : `Species: ${newSpecies}`;
+      return { content: [{ type: "text", text: `새 외형 미리보기:\n\n${previewLines}\n\nconfirm: true 로 적용하세요.` }] };
+    }
+
+    // Apply
+    db.prepare("UPDATE companions SET species = ? WHERE id = ?").run(newSpecies, row.id);
+    if (newCustomSprite) {
+      db.prepare(
+        `INSERT OR REPLACE INTO custom_sprites (companion_id, idle_frames, happy_frame, sad_frame, working_frame, updated_at)
+         VALUES (?, ?, ?, ?, ?, datetime('now'))`
+      ).run(row.id, JSON.stringify(newCustomSprite.idleFrames), JSON.stringify(newCustomSprite.happyFrame), JSON.stringify(newCustomSprite.sadFrame), JSON.stringify(newCustomSprite.workingFrame));
+    } else {
+      // Mode 1: remove custom sprite so species-based rendering takes over
+      db.prepare("DELETE FROM custom_sprites WHERE companion_id = ?").run(row.id);
+    }
+
+    const updated = db.prepare("SELECT * FROM companions WHERE id = ?").get(row.id) as any;
+    const companion = loadCompanion(updated)!;
+    writeBuddyStatus(companion, undefined, row.id);
+
+    return { content: [{ type: "text", text: `✨ ${row.name}의 외형이 바뀌었습니다! (${newSpecies})` }] };
   }
 
   throw new Error(`Tool not found: ${name}`);

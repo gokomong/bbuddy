@@ -87,12 +87,15 @@ try {
   if (buddy && buddy.name) {
     let ascii: string = "";
 
+    // Custom sprite frames take priority over species-based sprites
+    const hasCustomFrames = Array.isArray(buddy.custom_idle_frames) && buddy.custom_idle_frames.length > 0;
+
     // Try to use new sprite format if eye data is available
-    if (buddy.eye && SPRITE_BODIES[buddy.species]) {
+    if (hasCustomFrames || (buddy.eye && SPRITE_BODIES[buddy.species])) {
       // Force hat: 'none' in statusline — hat adds an extra line that spills past the HUD.
       // Hats are shown in the card display instead.
       const bones = { species: buddy.species, eye: buddy.eye, hat: 'none', rarity: buddy.rarity || 'common', shiny: buddy.is_shiny || false, stats: buddy.stats || {} } as any;
-      const frames = SPRITE_BODIES[buddy.species];
+      const frames = hasCustomFrames ? buddy.custom_idle_frames : SPRITE_BODIES[buddy.species];
       const totalFrames = frames.length;
       const hasReaction = buddy.reaction_expires && Date.now() < buddy.reaction_expires;
 
@@ -124,7 +127,9 @@ try {
         else frameIndex = (totalFrames - 1) % totalFrames;
       }
 
-      const artLines = renderSprite(bones, frameIndex);
+      const artLines = hasCustomFrames
+        ? (frames[frameIndex] as string[] ?? frames[0] as string[])
+        : renderSprite(bones, frameIndex);
       ascii = artLines.join('\n');
     }
 
