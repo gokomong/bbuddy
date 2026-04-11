@@ -1,3 +1,8 @@
+---
+name: stats
+description: Show your bbddy companion's stat breakdown
+---
+
 # /bbddy:stats — 스탯 카드 표시
 
 사용자가 `/bbddy:stats` 를 입력하면 이 스킬을 실행한다.

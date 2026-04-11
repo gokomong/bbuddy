@@ -1,3 +1,8 @@
+---
+name: on
+description: Unmute your bbddy companion
+---
+
 # /bbddy:on — 컴패니언 음소거 해제
 
 사용자가 `/bbddy:on` 을 입력하면 이 스킬을 실행한다.

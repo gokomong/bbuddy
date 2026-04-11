@@ -1,3 +1,8 @@
+---
+name: evolve
+description: Change your bbddy companion's appearance
+---
+
 # /bbddy:evolve — 컴패니언 외형 변경
 
 사용자가 `/bbddy:evolve` 를 입력하면 이 스킬을 실행한다.

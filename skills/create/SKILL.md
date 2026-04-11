@@ -1,3 +1,8 @@
+---
+name: create
+description: Create your own bbddy companion — name, appearance, personality, stats
+---
+
 # /bbddy:create — 컴패니언 생성 wizard
 
 사용자가 `/bbddy:create` 를 입력하면 이 스킬을 실행한다.

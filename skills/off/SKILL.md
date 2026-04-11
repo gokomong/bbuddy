@@ -1,3 +1,8 @@
+---
+name: off
+description: Mute your bbddy companion
+---
+
 # /bbddy:off — 컴패니언 음소거
 
 사용자가 `/bbddy:off` 를 입력하면 이 스킬을 실행한다.

@@ -1,3 +1,8 @@
+---
+name: show
+description: Show your bbddy companion's status card
+---
+
 # /bbddy:show — 컴패니언 상태 카드 표시
 
 사용자가 `/bbddy:show` 를 입력하면 이 스킬을 실행한다.

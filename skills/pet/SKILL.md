@@ -1,3 +1,8 @@
+---
+name: pet
+description: Pet your bbddy companion
+---
+
 # /bbddy:pet — 컴패니언 쓰다듬기
 
 사용자가 `/bbddy:pet` 을 입력하면 이 스킬을 실행한다.

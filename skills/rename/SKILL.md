@@ -1,3 +1,8 @@
+---
+name: rename
+description: Rename your bbddy companion
+---
+
 # /bbddy:rename — 컴패니언 이름 변경
 
 사용자가 `/bbddy:rename` 을 입력하면 이 스킬을 실행한다.
