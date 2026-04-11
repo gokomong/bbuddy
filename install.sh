@@ -66,37 +66,19 @@ SERVER_PATH="$INSTALL_DIR/dist/server/index.js"
 # ── Claude Code: MCP server ──
 
 configure_claude_code_mcp() {
-  local config_file="$CLAUDE_DIR/settings.json"
-  mkdir -p "$CLAUDE_DIR"
-
-  if [ ! -f "$config_file" ]; then
-    cat > "$config_file" << EOJSON
-{
-  "mcpServers": {
-    "bbddy": {
-      "command": "node",
-      "args": ["$SERVER_PATH"]
-    }
-  }
-}
-EOJSON
-    echo -e "  ${GREEN}✓${NC} Claude Code MCP configured"
-    return 0
-  fi
-
-  if grep -q '"bbddy"' "$config_file" 2>/dev/null; then
+  if claude mcp list 2>/dev/null | grep -q "^bbddy:"; then
     echo -e "  ${GREEN}✓${NC} Claude Code MCP already configured"
     return 0
   fi
 
-  node -e "
-    const fs = require('fs');
-    const config = JSON.parse(fs.readFileSync('$config_file', 'utf-8'));
-    if (!config.mcpServers) config.mcpServers = {};
-    config.mcpServers.bbddy = { command: 'node', args: ['$SERVER_PATH'] };
-    fs.writeFileSync('$config_file', JSON.stringify(config, null, 2));
-  " 2>/dev/null
-  echo -e "  ${GREEN}✓${NC} Claude Code MCP configured"
+  local node_path
+  node_path="$(command -v node)"
+  if claude mcp add bbddy "$node_path" "$SERVER_PATH" --scope user 2>/dev/null; then
+    echo -e "  ${GREEN}✓${NC} Claude Code MCP configured"
+  else
+    echo -e "  ${YELLOW}⚠${NC}  Could not auto-configure Claude Code MCP"
+    echo -e "     Run manually: claude mcp add bbddy '$node_path' '$SERVER_PATH' --scope user"
+  fi
 }
 
 # ── Claude Code: hooks ──

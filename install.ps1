@@ -63,28 +63,20 @@ function Ensure-Dir($path) {
 # ── Claude Code: MCP server ──
 
 function Add-MCP {
-  $configPath = "$CLAUDE_DIR\settings.json"
-  Ensure-Dir $CLAUDE_DIR
-
-  $buddyEntry = @{ command = "node"; args = @($SERVER_PATH_UNIX) }
-
-  if (!(Test-Path $configPath)) {
-    @{ mcpServers = @{ bbddy = $buddyEntry } } | ConvertTo-Json -Depth 5 | Set-Content $configPath -Encoding UTF8
-    Write-Host "  ✓ Claude Code MCP configured" -ForegroundColor Green
-    return
-  }
-
-  $content = Get-Content $configPath -Raw | ConvertFrom-Json
-  if ($content.mcpServers.bbddy) {
+  $existing = claude mcp list 2>$null
+  if ($existing -match "^bbddy:") {
     Write-Host "  ✓ Claude Code MCP already configured" -ForegroundColor Green
     return
   }
-  if (!$content.mcpServers) {
-    $content | Add-Member -NotePropertyName "mcpServers" -NotePropertyValue ([PSCustomObject]@{}) -Force
+
+  try { $nodePath = (Get-Command node -ErrorAction Stop).Source } catch { $nodePath = "node" }
+  $result = claude mcp add bbddy $nodePath $SERVER_PATH_UNIX --scope user 2>$null
+  if ($LASTEXITCODE -eq 0) {
+    Write-Host "  ✓ Claude Code MCP configured" -ForegroundColor Green
+  } else {
+    Write-Host "  ⚠  Could not auto-configure Claude Code MCP" -ForegroundColor Yellow
+    Write-Host "     Run manually: claude mcp add bbddy '$nodePath' '$SERVER_PATH_UNIX' --scope user" -ForegroundColor Yellow
   }
-  $content.mcpServers | Add-Member -NotePropertyName "bbddy" -NotePropertyValue $buddyEntry -Force
-  $content | ConvertTo-Json -Depth 5 | Set-Content $configPath -Encoding UTF8
-  Write-Host "  ✓ Claude Code MCP configured" -ForegroundColor Green
 }
 
 # ── Claude Code: hooks ──
