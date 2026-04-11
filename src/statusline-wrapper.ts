@@ -13,7 +13,7 @@ const GREEN = "\x1b[32m";
 const MAGENTA = "\x1b[35m";
 
 const toUnix = (p: string) => p.replace(/\\/g, "/");
-const BUDDY_STATUS_PATH = join(homedir(), ".claude", "buddy-status.json");
+const BUDDY_STATUS_PATH = join(homedir(), ".claude", "bbddy-status.json");
 const FRAME_INTERVAL_MS = 800;
 
 // True randomness for animation — each render picks a fresh random value.

@@ -1,11 +1,17 @@
 import Database from 'better-sqlite3';
 import path from 'path';
-import { mkdirSync } from 'fs';
+import { mkdirSync, existsSync, copyFileSync } from 'fs';
 import { homedir } from 'os';
 
-const buddyDir = path.join(homedir(), '.buddy');
-mkdirSync(buddyDir, { recursive: true });
-const dbPath = path.join(buddyDir, 'buddy.db');
+const bbddyDir = path.join(homedir(), '.bbddy');
+mkdirSync(bbddyDir, { recursive: true });
+const dbPath = path.join(bbddyDir, 'bbddy.db');
+
+// Migrate from old ~/.buddy/buddy.db if it exists and new DB doesn't
+const oldDbPath = path.join(homedir(), '.buddy', 'buddy.db');
+if (!existsSync(dbPath) && existsSync(oldDbPath)) {
+  try { copyFileSync(oldDbPath, dbPath); } catch { /* non-fatal */ }
+}
 
 export const db = new Database(dbPath);
 
@@ -66,4 +72,20 @@ export function initDb() {
       FOREIGN KEY(companion_id) REFERENCES companions(id)
     );
   `);
+
+  // bbddy schema migrations — safe to run on existing DBs
+  const cols = db.pragma('table_info(companions)') as any[];
+  const colNames = new Set(cols.map((c: any) => c.name));
+  if (!colNames.has('creation_mode')) {
+    db.exec(`
+      ALTER TABLE companions ADD COLUMN creation_mode TEXT DEFAULT 'hatched';
+      ALTER TABLE companions ADD COLUMN personality_preset TEXT DEFAULT NULL;
+      ALTER TABLE companions ADD COLUMN custom_prompt TEXT DEFAULT NULL;
+      ALTER TABLE companions ADD COLUMN stats_mode TEXT DEFAULT 'rolled';
+      ALTER TABLE companions ADD COLUMN rarity TEXT DEFAULT NULL;
+      ALTER TABLE companions ADD COLUMN eye TEXT DEFAULT NULL;
+      ALTER TABLE companions ADD COLUMN hat TEXT DEFAULT NULL;
+      ALTER TABLE companions ADD COLUMN stats_json TEXT DEFAULT NULL;
+    `);
+  }
 }

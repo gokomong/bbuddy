@@ -1,6 +1,7 @@
 // src/lib/observer.ts
 
 import { type Companion, type StatName, STAT_NAMES, getPeakStat, getDumpStat } from './types.js';
+import { PRESETS } from '../creator/presets.js';
 
 // --- Reaction States ---
 
@@ -113,6 +114,12 @@ Your peak trait is ${peakStat} (${companion.stats[peakStat]}/100). Your dump sta
 Stay in character. Keep total response under 3 sentences.
 
 What happened: ${summary}`;
+  }
+
+  // Inject personality preset tone if this is a created companion with a preset
+  if (companion.personalityPreset && companion.personalityPreset !== 'custom') {
+    const tone = PRESETS[companion.personalityPreset]?.observerTone;
+    if (tone) prompt += `\n\nTone guide: ${tone}`;
   }
 
   const templateFallback = templateReaction(companion, mode, summary, reaction.state);

@@ -12,26 +12,54 @@ import {
   generateName, calculateMood, getReaction,
   renderSprite,
 } from "../lib/species.js";
-import { type Companion, STAT_NAMES, RARITY_STARS, RARITY_ANSI, SPARKLE_EYE, getPeakStat, getDumpStat } from "../lib/types.js";
+import { type Companion, STAT_NAMES, RARITY_STARS, RARITY_ANSI, SPARKLE_EYE, PERSONALITY_PRESETS, getPeakStat, getDumpStat } from "../lib/types.js";
 import { roll, statBar } from "../lib/rng.js";
 import { generateBio } from "../lib/personality.js";
 import { buildObserverPrompt } from "../lib/observer.js";
 import { renderSpeechBubble } from "../lib/bubble.js";
 import { XP_REWARDS, levelFromXp, levelBar, levelProgress } from "../lib/leveling.js";
+import { evaluateWizardState, renderWizardPrompt, renderPreviewText, type WizardArgs } from "../creator/index.js";
+import { generatePresetBio, PRESETS } from "../creator/presets.js";
+import { validateStatDistribution, normaliseStats } from "../creator/stats.js";
 import { randomUUID } from "crypto";
 import { writeFileSync, mkdirSync, unlinkSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 
-const BUDDY_STATUS_PATH = join(homedir(), ".claude", "buddy-status.json");
+const BUDDY_STATUS_PATH = join(homedir(), ".claude", "bbddy-status.json");
 let statusDirEnsured = false;
 const RESET = '\x1b[0m';
 
 // Note: when species was overridden at hatch time, bones (rarity, stats, eye, hat)
 // still come from the deterministic roll. Only species name comes from DB.
 // This is intentional — bones are tied to the userId hash, not the species.
+// For created companions (creation_mode === 'created'), bones are stored directly in DB.
 function loadCompanion(row: any, userIdOverride?: string): Companion | null {
   if (!row) return null;
+
+  if (row.creation_mode === 'created') {
+    const stats = row.stats_json ? JSON.parse(row.stats_json) : Object.fromEntries(STAT_NAMES.map(n => [n, 20]));
+    return {
+      rarity: row.rarity || 'uncommon',
+      species: row.species,
+      eye: row.eye || '·',
+      hat: row.hat || 'none',
+      shiny: false,
+      stats,
+      name: row.name,
+      personalityBio: row.personality_bio || '',
+      level: row.level,
+      xp: row.xp,
+      mood: row.mood,
+      hatchedAt: new Date(row.created_at).getTime(),
+      creationMode: 'created',
+      personalityPreset: row.personality_preset,
+      customPrompt: row.custom_prompt,
+      statsMode: row.stats_mode || 'manual',
+    };
+  }
+
+  // Hatched companions: derive bones from userId hash (original behavior)
   const userId = userIdOverride || row.user_id || 'anon';
   const { bones } = roll(userId, SPECIES_LIST);
   return {
@@ -43,6 +71,7 @@ function loadCompanion(row: any, userIdOverride?: string): Companion | null {
     xp: row.xp,
     mood: row.mood,
     hatchedAt: new Date(row.created_at).getTime(),
+    creationMode: 'hatched',
   };
 }
 
@@ -167,7 +196,7 @@ function hatchAnimation(companion: Companion): string {
     '',
     `${companion.name} is here · it'll chime in as you code`,
     `uses the same AI subscription you're on`,
-    `say its name to get its take · /buddy pet · /buddy off`,
+    `say its name to get its take · /bbddy:pet · /bbddy:off`,
   ].join('\n');
 
   return [
@@ -219,8 +248,8 @@ function writeBuddyStatus(companion: Companion, reaction?: { state: string; text
 
 const server = new Server(
   {
-    name: "buddy",
-    version: "1.0.0",
+    name: "bbddy",
+    version: "0.1.0",
   },
   {
     capabilities: {
@@ -240,8 +269,41 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
       {
-        name: "buddy_hatch",
-        description: "Hatch a new Buddy companion.",
+        name: "bbddy_create",
+        description: "Create a custom bbddy companion through a 4-step wizard (name → species → personality → stats). Provide all parameters at once, or provide partial parameters to get guided prompts for the remaining steps. Set confirm: true once all parameters are ready to finalize creation.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            name: { type: "string", description: "Your companion's name." },
+            species: {
+              type: "string",
+              enum: [...SPECIES_LIST],
+              description: "Species (appearance template). Choose from the 21 available species.",
+            },
+            personality_preset: {
+              type: "string",
+              enum: [...PERSONALITY_PRESETS],
+              description: "Personality archetype: tsundere, passionate, cold, prankster, sage, or custom.",
+            },
+            custom_prompt: {
+              type: "string",
+              description: "Custom personality description (required when personality_preset is 'custom').",
+            },
+            stats: {
+              type: "object",
+              description: `Stat distribution. Must sum to 100, each value 1–80. Stats: ${STAT_NAMES.join(', ')}.`,
+              properties: Object.fromEntries(STAT_NAMES.map(n => [n, { type: "number" }])),
+            },
+            confirm: {
+              type: "boolean",
+              description: "Set to true to finalize creation after reviewing the preview.",
+            },
+          },
+        },
+      },
+      {
+        name: "bbddy_hatch",
+        description: "Hatch a new bbddy companion using deterministic RNG (random species + stats based on user_id). Use bbddy_create instead if you want to design your own companion.",
         inputSchema: {
           type: "object",
           properties: {
@@ -256,8 +318,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: "buddy_status",
-        description: "Get the current status of your Buddy companion. Call this at the start of a conversation to check on your buddy and learn its personality.",
+        name: "bbddy_status",
+        description: "Get the current status of your bbddy companion. Call this at the start of a conversation to check on your buddy and learn its personality.",
         inputSchema: {
           type: "object",
           properties: {
@@ -266,8 +328,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: "buddy_remember",
-        description: "Manually add a memory for your Buddy to observe.",
+        name: "bbddy_remember",
+        description: "Manually add a memory for your bbddy to observe.",
         inputSchema: {
           type: "object",
           properties: {
@@ -278,7 +340,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: "buddy_dream",
+        name: "bbddy_dream",
         description: "Trigger memory consolidation (Dreaming).",
         inputSchema: {
           type: "object",
@@ -289,16 +351,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: "buddy_respawn",
-        description: "Release your current Buddy companion and clear all data. Use buddy_hatch afterwards to get a new one.",
+        name: "bbddy_respawn",
+        description: "Release your current bbddy companion and clear all data. Use bbddy_hatch or bbddy_create afterwards to get a new one.",
         inputSchema: {
           type: "object",
           properties: {},
         },
       },
       {
-        name: "buddy_observe",
-        description: "IMPORTANT: Call this tool automatically after completing any coding task (writing code, fixing a bug, refactoring, running tests, deploying). Pass a 1-sentence summary of what was done. Returns your buddy's in-character reaction with a speech bubble and XP rewards. The user expects this to happen after every task — do not skip it.",
+        name: "bbddy_observe",
+        description: "IMPORTANT: Call this tool automatically after completing any coding task (writing code, fixing a bug, refactoring, running tests, deploying). Pass a 1-sentence summary of what was done. Returns your bbddy's in-character reaction with a speech bubble and XP rewards. The user expects this to happen after every task — do not skip it.",
         inputSchema: {
           type: "object",
           properties: {
@@ -320,18 +382,18 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: "buddy_pet",
-        description: "Pet your buddy! Shows a heart animation and a happy reaction.",
+        name: "bbddy_pet",
+        description: "Pet your bbddy! Shows a heart animation and a happy reaction.",
         inputSchema: { type: "object", properties: {} },
       },
       {
-        name: "buddy_mute",
-        description: "Mute your buddy. It won't chime in until unmuted.",
+        name: "bbddy_mute",
+        description: "Mute your bbddy. It won't chime in until unmuted.",
         inputSchema: { type: "object", properties: {} },
       },
       {
-        name: "buddy_unmute",
-        description: "Unmute your buddy so it can chime in again.",
+        name: "bbddy_unmute",
+        description: "Unmute your bbddy so it can chime in again.",
         inputSchema: { type: "object", properties: {} },
       },
     ],
@@ -342,7 +404,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
-  if (name === "buddy_hatch") {
+  if (name === "bbddy_hatch") {
     const { name: requestedName, species: requestedSpecies, user_id } = args as {
       name?: string; species?: string; user_id?: string;
     };
@@ -387,11 +449,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
   }
 
-  if (name === "buddy_status") {
+  if (name === "bbddy_status") {
     const { user_id } = args as { user_id?: string };
     const row = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
     if (!row) {
-      return { content: [{ type: "text", text: "No companion hatched yet! Use buddy_hatch to start." }] };
+      return { content: [{ type: "text", text: "No companion hatched yet! Use bbddy_hatch or bbddy_create to start." }] };
     }
 
     const userId = user_id || row.user_id || 'anon';
@@ -414,7 +476,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     return { content: [{ type: "text", text: statusCard }] };
   }
 
-  if (name === "buddy_remember") {
+  if (name === "bbddy_remember") {
     const { content, importance = 1 } = args as { content: string, importance?: number };
     const companion = db.prepare("SELECT id FROM companions LIMIT 1").get() as any;
     if (!companion) return { content: [{ type: "text", text: "Hatch a companion first!" }] };
@@ -428,7 +490,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
   }
 
-  if (name === "buddy_dream") {
+  if (name === "bbddy_dream") {
     const { depth } = args as { depth: 'light' | 'deep' };
     // Placeholder for actual consolidation logic
     return {
@@ -436,11 +498,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
   }
 
-  if (name === "buddy_respawn") {
+  if (name === "bbddy_respawn") {
     const companion = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
     if (!companion) {
       return {
-        content: [{ type: "text", text: "No companion to release. Use buddy_hatch to get started!" }],
+        content: [{ type: "text", text: "No companion to release. Use bbddy_hatch or bbddy_create to get started!" }],
       };
     }
 
@@ -460,19 +522,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     return {
       content: [
         { type: "text", text: `${oldName} the ${oldSpecies} has been released. Goodbye, friend!` },
-        { type: "text", text: "Use buddy_hatch to welcome a new companion." },
+        { type: "text", text: "Use bbddy_hatch to hatch a new companion, or bbddy_create to design your own." },
       ],
     };
   }
 
-  if (name === "buddy_observe") {
+  if (name === "bbddy_observe") {
     const { summary, mode = 'both', user_id } = args as {
       summary: string; mode?: 'backseat' | 'skillcoach' | 'both'; user_id?: string;
     };
 
     const row = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
     if (!row) {
-      return { content: [{ type: "text", text: "No companion hatched yet! Use buddy_hatch first." }] };
+      return { content: [{ type: "text", text: "No companion hatched yet! Use bbddy_hatch or bbddy_create first." }] };
     }
 
     const companion = loadCompanion(row, user_id)!;
@@ -521,10 +583,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
   }
 
-  if (name === "buddy_pet") {
+  if (name === "bbddy_pet") {
     const row = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
     if (!row) {
-      return { content: [{ type: "text", text: "No companion to pet! Use buddy_hatch first." }] };
+      return { content: [{ type: "text", text: "No companion to pet! Use bbddy_hatch or bbddy_create first." }] };
     }
 
     const companion = loadCompanion(row)!;
@@ -573,10 +635,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     return { content: [{ type: "text", text: petDisplay }] };
   }
 
-  if (name === "buddy_mute") {
+  if (name === "bbddy_mute") {
     const row = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
     if (!row) {
-      return { content: [{ type: "text", text: "No companion to mute! Use buddy_hatch first." }] };
+      return { content: [{ type: "text", text: "No companion to mute! Use bbddy_hatch or bbddy_create first." }] };
     }
 
     db.prepare("UPDATE companions SET mood = 'muted' WHERE id = ?").run(row.id);
@@ -584,13 +646,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // Remove status file so statusline goes blank
     try { unlinkSync(BUDDY_STATUS_PATH); } catch { /* already gone */ }
 
-    return { content: [{ type: "text", text: `${row.name} has been muted. Use buddy_unmute to bring it back.` }] };
+    return { content: [{ type: "text", text: `${row.name} has been muted. Use bbddy_unmute to bring it back.` }] };
   }
 
-  if (name === "buddy_unmute") {
+  if (name === "bbddy_unmute") {
     const row = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
     if (!row) {
-      return { content: [{ type: "text", text: "No companion to unmute! Use buddy_hatch first." }] };
+      return { content: [{ type: "text", text: "No companion to unmute! Use bbddy_hatch or bbddy_create first." }] };
     }
 
     db.prepare("UPDATE companions SET mood = 'happy' WHERE id = ?").run(row.id);
@@ -598,6 +660,91 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     writeBuddyStatus(companion);
 
     return { content: [{ type: "text", text: `${companion.name} is back! It'll chime in as you code.` }] };
+  }
+
+  if (name === "bbddy_create") {
+    const wizardArgs = args as WizardArgs;
+    const state = evaluateWizardState(wizardArgs);
+
+    // Incomplete — show wizard prompt for the current step
+    if (state.step !== 'ready') {
+      return { content: [{ type: "text", text: renderWizardPrompt(state, wizardArgs) }] };
+    }
+
+    // All fields present — validate stats
+    const statsRaw = wizardArgs.stats as Record<string, number>;
+    const statsCheck = validateStatDistribution(statsRaw);
+    if (!statsCheck.valid) {
+      return { content: [{ type: "text", text: `⚠ Stat error: ${statsCheck.error}` }] };
+    }
+    const stats = normaliseStats(statsRaw);
+
+    const preset = wizardArgs.personality_preset as typeof PERSONALITY_PRESETS[number];
+    const bio = generatePresetBio(preset, wizardArgs.name!, wizardArgs.species!, stats, wizardArgs.custom_prompt);
+    const presetLabel = PRESETS[preset].label;
+
+    // Show preview if not yet confirmed
+    if (!wizardArgs.confirm) {
+      const preview = renderPreviewText(wizardArgs.name!, wizardArgs.species!, presetLabel, bio, stats);
+      return {
+        content: [{
+          type: "text",
+          text: `${preview}\n\n캐릭터가 마음에 드시나요? confirm: true 로 호출하면 확정됩니다.\n뒤로 가려면 파라미터를 수정해서 다시 호출하세요.`,
+        }],
+      };
+    }
+
+    // Confirmed — check no existing companion
+    const existing = db.prepare("SELECT id FROM companions LIMIT 1").get() as any;
+    if (existing) {
+      return {
+        content: [{ type: "text", text: "이미 companion이 있습니다. bbddy_respawn으로 해제한 뒤 다시 시도하세요." }],
+      };
+    }
+
+    const id = randomUUID();
+    db.prepare(
+      `INSERT INTO companions
+        (id, name, species, user_id, personality_bio, creation_mode, personality_preset, custom_prompt, stats_mode, rarity, eye, hat, stats_json)
+       VALUES (?, ?, ?, ?, ?, 'created', ?, ?, 'manual', 'uncommon', '·', 'none', ?)`
+    ).run(
+      id,
+      wizardArgs.name!,
+      wizardArgs.species!,
+      'created-' + id,
+      bio,
+      preset,
+      wizardArgs.custom_prompt || null,
+      JSON.stringify(stats),
+    );
+
+    const companion: Companion = {
+      rarity: 'uncommon',
+      species: wizardArgs.species!,
+      eye: '·',
+      hat: 'none',
+      shiny: false,
+      stats,
+      name: wizardArgs.name!,
+      personalityBio: bio,
+      level: 1,
+      xp: 0,
+      mood: 'happy',
+      hatchedAt: Date.now(),
+      creationMode: 'created',
+      personalityPreset: preset,
+      customPrompt: wizardArgs.custom_prompt,
+      statsMode: 'manual',
+    };
+
+    writeBuddyStatus(companion);
+
+    return {
+      content: [
+        { type: "text", text: hatchAnimation(companion) },
+        { type: "text", text: getReaction(companion.species, 'hatch', 'happy') },
+      ],
+    };
   }
 
   throw new Error(`Tool not found: ${name}`);
@@ -608,19 +755,19 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
   return {
     resources: [
       {
-        uri: "buddy://companion",
+        uri: "bbddy://companion",
         name: "Current Companion Info",
         description: "The current state and personality of your Buddy.",
         mimeType: "application/json",
       },
       {
-        uri: "buddy://status",
+        uri: "bbddy://status",
         name: "Current Buddy Status Card",
         description: "An ASCII status card for the current Buddy, suitable for prompt injection.",
         mimeType: "text/plain",
       },
       {
-        uri: "buddy://intro",
+        uri: "bbddy://intro",
         name: "Companion System Prompt",
         description: "Text for injecting buddy context into the CLI's system prompt. Read this on startup.",
         mimeType: "text/plain",
@@ -633,7 +780,7 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
 server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   const { uri } = request.params;
 
-  if (uri === "buddy://companion") {
+  if (uri === "bbddy://companion") {
     const row = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
     if (!row) {
       return { contents: [{ uri, mimeType: "application/json", text: JSON.stringify({ message: "No companion hatched" }) }] };
@@ -642,7 +789,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     return { contents: [{ uri, mimeType: "application/json", text: JSON.stringify(companion) }] };
   }
 
-  if (uri === "buddy://status") {
+  if (uri === "bbddy://status") {
     const row = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
     if (!row) {
       return { contents: [{ uri, mimeType: "text/plain", text: "No companion hatched yet." }] };
@@ -655,10 +802,10 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     return { contents: [{ uri, mimeType: "text/plain", text: card }] };
   }
 
-  if (uri === "buddy://intro") {
+  if (uri === "bbddy://intro") {
     const row = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
     if (!row) {
-      return { contents: [{ uri, mimeType: "text/plain", text: "No companion hatched yet. Use buddy_hatch to get started." }] };
+      return { contents: [{ uri, mimeType: "text/plain", text: "No companion hatched yet. Use bbddy_hatch or bbddy_create to get started." }] };
     }
     const companion = loadCompanion(row)!;
     const peakStat = getPeakStat(companion.stats);
@@ -668,7 +815,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
 
 A small ${companion.species} named ${companion.name} watches from your terminal. ${companion.personalityBio}
 
-${companion.name} reacts to your work via the buddy_observe tool. After completing an action, call buddy_observe with a brief summary of what you did. ${companion.name}'s reactions are personality-flavored — ${peakStat} is their strength (${companion.stats[peakStat]}/100), ${dumpStat} is their weakness (${companion.stats[dumpStat]}/100).
+${companion.name} reacts to your work via the bbddy_observe tool. After completing an action, call bbddy_observe with a brief summary of what you did. ${companion.name}'s reactions are personality-flavored — ${peakStat} is their strength (${companion.stats[peakStat]}/100), ${dumpStat} is their weakness (${companion.stats[dumpStat]}/100).
 
 When the user addresses ${companion.name} by name, respond briefly in character as ${companion.name} before your normal response. Don't explain that you're not ${companion.name} — they know.`;
 

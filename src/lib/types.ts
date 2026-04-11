@@ -33,6 +33,11 @@ export type Companion = CompanionBones & CompanionSoul & {
   xp: number;
   mood: string;
   hatchedAt: number;
+  // bbddy creator fields (optional — hatched companions omit these)
+  creationMode?: 'hatched' | 'created';
+  personalityPreset?: PersonalityPreset;
+  customPrompt?: string;
+  statsMode?: 'rolled' | 'manual';
 };
 
 export const RARITY_WEIGHTS: Record<Rarity, number> = {
@@ -95,3 +100,7 @@ export function getDumpStat(stats: Record<StatName, number>): StatName {
   }
   return dump;
 }
+
+// bbddy creator extensions
+export const PERSONALITY_PRESETS = ['tsundere', 'passionate', 'cold', 'prankster', 'sage', 'custom'] as const;
+export type PersonalityPreset = (typeof PERSONALITY_PRESETS)[number];
