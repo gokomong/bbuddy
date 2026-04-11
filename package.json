@@ -13,7 +13,7 @@
   ],
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node -e \"require('fs').cpSync('src/creator/sprites', 'dist/creator/sprites', {recursive:true})\"",
     "start": "node dist/server/index.js",
     "dev": "ts-node src/server/index.ts",
     "test": "vitest run",
