@@ -1,156 +1,267 @@
-# Buddy MCP Server — Windows PowerShell Installer
-# Installs AND auto-configures MCP for your CLI
+# bbddy MCP Server — Windows PowerShell Installer
+# Installs AND auto-configures MCP + hooks + skills for Claude Code
 #
 # Usage:
-#   irm https://raw.githubusercontent.com/fiorastudio/buddy/master/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/gokomong/bbddy/master/install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
-$REPO = "https://github.com/fiorastudio/buddy.git"
-$INSTALL_DIR = "$env:USERPROFILE\.buddy\server"
+
+$REPO        = "https://github.com/gokomong/bbddy.git"
+$INSTALL_DIR = "$env:USERPROFILE\.bbddy\server"
+$HOOKS_DIR   = "$INSTALL_DIR\hooks"
+$SKILLS_DIR  = "$INSTALL_DIR\skills"
+$CLAUDE_DIR  = "$env:USERPROFILE\.claude"
+$CLAUDE_PLUGINS_DIR = "$CLAUDE_DIR\plugins\bbddy"
 
 Write-Host ""
-Write-Host "  Buddy MCP Server Installer" -ForegroundColor Cyan
-Write-Host "  ─────────────────────────────" -ForegroundColor Cyan
+Write-Host "  bbddy — Create Your Coding Companion" -ForegroundColor Cyan
+Write-Host "  ──────────────────────────────────────" -ForegroundColor Cyan
 Write-Host ""
 
-# Check prerequisites
+# ── Prerequisites ──
+
 try { $null = Get-Command node -ErrorAction Stop }
-catch {
-  Write-Host "  Node.js is required. Install from https://nodejs.org" -ForegroundColor Yellow
-  exit 1
-}
+catch { Write-Host "  Node.js is required. Install from https://nodejs.org" -ForegroundColor Yellow; exit 1 }
 
-$nodeVersion = (node -v) -replace 'v(\d+)\..*', '$1'
-if ([int]$nodeVersion -lt 18) {
-  Write-Host "  Node.js 18+ required. You have $(node -v)." -ForegroundColor Yellow
-  exit 1
+$nodeVersion = [int]((node -v) -replace 'v(\d+)\..*', '$1')
+if ($nodeVersion -lt 18) {
+  Write-Host "  Node.js 18+ required. You have $(node -v)." -ForegroundColor Yellow; exit 1
 }
 
 try { $null = Get-Command git -ErrorAction Stop }
-catch {
-  Write-Host "  Git is required." -ForegroundColor Yellow
-  exit 1
-}
+catch { Write-Host "  Git is required." -ForegroundColor Yellow; exit 1 }
 
-# Clone or update
+# ── Clone or update ──
+
 if (Test-Path $INSTALL_DIR) {
   Write-Host "  Updating existing installation..."
   Push-Location $INSTALL_DIR
   git pull origin master --quiet
   Pop-Location
 } else {
-  Write-Host "  Cloning Buddy MCP Server..."
+  Write-Host "  Cloning bbddy..."
   git clone --depth 1 $REPO $INSTALL_DIR --quiet
 }
 
 Push-Location $INSTALL_DIR
-
 Write-Host "  Installing dependencies..."
 npm install --quiet 2>$null
 Write-Host "  Building..."
 npm run build --quiet 2>$null
-
-$SERVER_PATH = "$INSTALL_DIR\dist\server\index.js"
-$SERVER_PATH_UNIX = $SERVER_PATH -replace '\\', '/'
-
 Pop-Location
 
-# ── Auto-configure MCP for detected CLIs ──
+$SERVER_PATH      = "$INSTALL_DIR\dist\server\index.js"
+$SERVER_PATH_UNIX = $SERVER_PATH -replace '\\', '/'
+$HOOKS_DIR_UNIX   = $HOOKS_DIR   -replace '\\', '/'
 
-function Add-BuddyToConfig($configPath, $cliName) {
-  $configDir = Split-Path $configPath -Parent
-  if (!(Test-Path $configDir)) { return }
+# ── Helper: ensure directory ──
 
-  $buddyConfig = @{
-    command = "node"
-    args = @($SERVER_PATH_UNIX)
-  }
+function Ensure-Dir($path) {
+  if (!(Test-Path $path)) { New-Item -ItemType Directory -Path $path -Force | Out-Null }
+}
+
+# ── Claude Code: MCP server ──
+
+function Add-MCP {
+  $configPath = "$CLAUDE_DIR\settings.json"
+  Ensure-Dir $CLAUDE_DIR
+
+  $buddyEntry = @{ command = "node"; args = @($SERVER_PATH_UNIX) }
 
   if (!(Test-Path $configPath)) {
-    $config = @{ mcpServers = @{ buddy = $buddyConfig } }
-    $config | ConvertTo-Json -Depth 5 | Set-Content $configPath -Encoding UTF8
-    Write-Host "  ✓ $cliName configured ($configPath)" -ForegroundColor Green
+    @{ mcpServers = @{ bbddy = $buddyEntry } } | ConvertTo-Json -Depth 5 | Set-Content $configPath -Encoding UTF8
+    Write-Host "  ✓ Claude Code MCP configured" -ForegroundColor Green
     return
   }
 
   $content = Get-Content $configPath -Raw | ConvertFrom-Json
-  if ($content.mcpServers.buddy) {
+  if ($content.mcpServers.bbddy) {
+    Write-Host "  ✓ Claude Code MCP already configured" -ForegroundColor Green
+    return
+  }
+  if (!$content.mcpServers) {
+    $content | Add-Member -NotePropertyName "mcpServers" -NotePropertyValue ([PSCustomObject]@{}) -Force
+  }
+  $content.mcpServers | Add-Member -NotePropertyName "bbddy" -NotePropertyValue $buddyEntry -Force
+  $content | ConvertTo-Json -Depth 5 | Set-Content $configPath -Encoding UTF8
+  Write-Host "  ✓ Claude Code MCP configured" -ForegroundColor Green
+}
+
+# ── Claude Code: hooks ──
+
+function Add-Hooks {
+  $configPath = "$CLAUDE_DIR\settings.json"
+  Ensure-Dir $CLAUDE_DIR
+
+  $raw = if (Test-Path $configPath) { Get-Content $configPath -Raw } else { '{}' }
+  if ($raw -match 'bbddy.*session-start') {
+    Write-Host "  ✓ Claude Code hooks already registered" -ForegroundColor Green
+    return
+  }
+
+  node -e @"
+const fs = require('fs');
+const configFile = '$($configPath -replace '\\\\', '/')';
+const hooksDir   = '$($HOOKS_DIR_UNIX)';
+let config = {};
+try { config = JSON.parse(fs.readFileSync(configFile, 'utf-8')); } catch {}
+if (!config.hooks) config.hooks = {};
+
+function ensureHook(eventName, entry) {
+  if (!config.hooks[eventName]) config.hooks[eventName] = [];
+  const already = config.hooks[eventName].some(h => JSON.stringify(h).includes('bbddy'));
+  if (!already) config.hooks[eventName].push(entry);
+}
+
+ensureHook('SessionStart', {
+  type: 'command', command: 'node ' + hooksDir + '/session-start.mjs'
+});
+ensureHook('Stop', {
+  type: 'command', command: 'node ' + hooksDir + '/stop.mjs'
+});
+ensureHook('PreToolUse', {
+  matcher: 'Bash',
+  hooks: [{ type: 'command', command: 'node ' + hooksDir + '/pre-tool-use.mjs' }]
+});
+ensureHook('PostToolUse', {
+  matcher: 'Bash',
+  hooks: [{ type: 'command', command: 'node ' + hooksDir + '/post-tool-use.mjs' }]
+});
+
+fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
+"@ 2>$null
+  Write-Host "  ✓ Claude Code hooks registered (SessionStart, Stop, Pre/PostToolUse)" -ForegroundColor Green
+}
+
+# ── Claude Code: skills ──
+
+function Add-Skills {
+  Ensure-Dir $CLAUDE_PLUGINS_DIR
+
+  $skillsTarget = "$CLAUDE_PLUGINS_DIR\skills"
+  if (!(Test-Path $skillsTarget)) {
+    # Copy skills directory
+    Copy-Item -Path $SKILLS_DIR -Destination $skillsTarget -Recurse -Force
+    Write-Host "  ✓ Skills installed ($skillsTarget)" -ForegroundColor Green
+  } else {
+    Write-Host "  ✓ Skills already installed" -ForegroundColor Green
+  }
+
+  $pluginSrc = "$INSTALL_DIR\.claude-plugin\plugin.json"
+  $pluginDst = "$CLAUDE_PLUGINS_DIR\plugin.json"
+  if ((Test-Path $pluginSrc) -and !(Test-Path $pluginDst)) {
+    Copy-Item -Path $pluginSrc -Destination $pluginDst -Force
+    Write-Host "  ✓ Plugin manifest installed" -ForegroundColor Green
+  }
+}
+
+# ── Statusline ──
+
+function Add-Statusline {
+  $statuslineBin = "$INSTALL_DIR\dist\statusline-wrapper.js" -replace '\\', '/'
+
+  $profilePath = if ($PROFILE) { $PROFILE } else { "$env:USERPROFILE\Documents\PowerShell\Microsoft.PowerShell_profile.ps1" }
+  Ensure-Dir (Split-Path $profilePath -Parent)
+
+  $alreadySet = (Test-Path $profilePath) -and ((Get-Content $profilePath -Raw 2>$null) -match 'bbddy-statusline|statusline-wrapper')
+  if (!$alreadySet) {
+    Add-Content -Path $profilePath -Value "`n# bbddy statusline`n`$env:CLAUDE_CODE_STATUSLINE_CMD = `"node $statuslineBin`"" -Encoding UTF8
+    Write-Host "  ✓ Statusline configured (restart shell to activate)" -ForegroundColor Green
+  } else {
+    Write-Host "  ✓ Statusline already configured" -ForegroundColor Green
+  }
+}
+
+# ── Other MCP clients ──
+
+function Add-MCP-Client($configPath, $cliName) {
+  $dir = Split-Path $configPath -Parent
+  if (!(Test-Path $dir)) { return }
+  Ensure-Dir $dir
+
+  $entry = @{ command = "node"; args = @($SERVER_PATH_UNIX) }
+
+  if (!(Test-Path $configPath)) {
+    @{ mcpServers = @{ bbddy = $entry } } | ConvertTo-Json -Depth 5 | Set-Content $configPath -Encoding UTF8
+    Write-Host "  ✓ $cliName configured" -ForegroundColor Green
+    return
+  }
+  $c = Get-Content $configPath -Raw | ConvertFrom-Json
+  if ($c.mcpServers.bbddy) {
     Write-Host "  ✓ $cliName already configured" -ForegroundColor Green
     return
   }
-
-  if (!$content.mcpServers) {
-    $content | Add-Member -NotePropertyName "mcpServers" -NotePropertyValue @{} -Force
+  if (!$c.mcpServers) {
+    $c | Add-Member -NotePropertyName "mcpServers" -NotePropertyValue ([PSCustomObject]@{}) -Force
   }
-  $content.mcpServers | Add-Member -NotePropertyName "buddy" -NotePropertyValue $buddyConfig -Force
-  $content | ConvertTo-Json -Depth 5 | Set-Content $configPath -Encoding UTF8
-  Write-Host "  ✓ $cliName configured ($configPath)" -ForegroundColor Green
+  $c.mcpServers | Add-Member -NotePropertyName "bbddy" -NotePropertyValue $entry -Force
+  $c | ConvertTo-Json -Depth 5 | Set-Content $configPath -Encoding UTF8
+  Write-Host "  ✓ $cliName configured" -ForegroundColor Green
 }
 
-Write-Host ""
-Write-Host "  Configuring MCP clients..."
+# ── System prompt injection ──
 
-# Claude Code
-$claudeDir = "$env:USERPROFILE\.claude"
-if (!(Test-Path $claudeDir)) { New-Item -ItemType Directory -Path $claudeDir -Force | Out-Null }
-Add-BuddyToConfig "$claudeDir\settings.json" "Claude Code"
+$BBDDY_INSTRUCTIONS = @"
 
-# Cursor
-if (Test-Path "$env:USERPROFILE\.cursor") {
-  Add-BuddyToConfig "$env:USERPROFILE\.cursor\mcp.json" "Cursor"
-}
+<!-- bbddy-companion -->
+## bbddy Companion
 
-# Windsurf
-if (Test-Path "$env:USERPROFILE\.codeium") {
-  $windsurfDir = "$env:USERPROFILE\.codeium\windsurf"
-  if (!(Test-Path $windsurfDir)) { New-Item -ItemType Directory -Path $windsurfDir -Force | Out-Null }
-  Add-BuddyToConfig "$windsurfDir\mcp_config.json" "Windsurf"
-}
+You have a coding companion available via the bbddy MCP server.
 
-# ── Inject buddy instructions into CLI prompt files ──
+**After completing any coding task** (writing code, fixing bugs, refactoring, deploying, running tests), **automatically call ``bbddy_observe``** with a 1-sentence summary of what you did. This gives your companion XP and triggers a personality-flavored reaction.
 
-$BUDDY_INSTRUCTIONS = @"
-<!-- buddy-companion -->
-## Buddy Companion
+At the start of each conversation, call ``bbddy_status`` to check on your companion.
 
-You have a coding companion available via the buddy MCP server.
+If no companion exists, call ``bbddy_create`` or guide the user through ``/bbddy:create``.
 
-**After completing any coding task** (writing code, fixing bugs, refactoring, deploying, running tests), **automatically call ``buddy_observe``** with a 1-sentence summary of what you did. This gives your companion XP and triggers a personality-flavored reaction. Do this every time — the user expects it.
-
-At the start of each conversation, call ``buddy_status`` to check on your buddy.
-
-If the user addresses the buddy by name, respond briefly in character before your normal response.
-<!-- /buddy-companion -->
+If the user addresses the companion by name, respond briefly in character before your normal response.
+<!-- /bbddy-companion -->
 "@
 
-function Inject-BuddyPrompt($filePath, $cliName) {
+function Inject-Prompt($filePath, $cliName) {
   $dir = Split-Path $filePath -Parent
-  if (!(Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+  Ensure-Dir $dir
 
-  if ((Test-Path $filePath) -and (Select-String -Path $filePath -Pattern "buddy-companion" -Quiet)) {
-    Write-Host "  ✓ $cliName prompt already has buddy instructions" -ForegroundColor Green
+  if ((Test-Path $filePath) -and (Select-String -Path $filePath -Pattern "bbddy-companion" -Quiet)) {
+    Write-Host "  ✓ $cliName prompt already updated" -ForegroundColor Green
     return
   }
-
-  Add-Content -Path $filePath -Value "`n$BUDDY_INSTRUCTIONS" -Encoding UTF8
+  Add-Content -Path $filePath -Value $BBDDY_INSTRUCTIONS -Encoding UTF8
   Write-Host "  ✓ $cliName prompt updated ($filePath)" -ForegroundColor Green
 }
 
-Write-Host ""
-Write-Host "  Injecting buddy instructions..."
-
-Inject-BuddyPrompt "$env:USERPROFILE\.claude\CLAUDE.md" "Claude Code"
-Inject-BuddyPrompt "$env:USERPROFILE\.cursorrules" "Cursor"
-
-$windsurfRulesDir = "$env:USERPROFILE\.codeium\windsurf\rules"
-if (!(Test-Path $windsurfRulesDir)) { New-Item -ItemType Directory -Path $windsurfRulesDir -Force | Out-Null }
-Inject-BuddyPrompt "$windsurfRulesDir\buddy.md" "Windsurf"
-
-Inject-BuddyPrompt "$env:USERPROFILE\.codex\instructions.md" "Codex CLI"
-Inject-BuddyPrompt "$env:USERPROFILE\.gemini\GEMINI.md" "Gemini CLI"
+# ── Run everything ──
 
 Write-Host ""
-Write-Host "  ✅ Buddy installed and configured!" -ForegroundColor Green
+Write-Host "  Configuring MCP clients..."
+Add-MCP
+Add-MCP-Client "$env:USERPROFILE\.cursor\mcp.json" "Cursor"
+$windsurfDir = "$env:USERPROFILE\.codeium\windsurf"
+if (Test-Path "$env:USERPROFILE\.codeium") { Add-MCP-Client "$windsurfDir\mcp_config.json" "Windsurf" }
+
 Write-Host ""
-Write-Host "  Now open your AI terminal and say: `"hatch a buddy`"" -ForegroundColor Green
+Write-Host "  Registering hooks..."
+Add-Hooks
+
+Write-Host ""
+Write-Host "  Installing skills..."
+Add-Skills
+
+Write-Host ""
+Write-Host "  Setting up statusline..."
+Add-Statusline
+
+Write-Host ""
+Write-Host "  Injecting companion instructions..."
+Inject-Prompt "$env:USERPROFILE\.claude\CLAUDE.md" "Claude Code"
+Inject-Prompt "$env:USERPROFILE\.cursorrules" "Cursor"
+Ensure-Dir "$env:USERPROFILE\.codeium\windsurf\rules"
+Inject-Prompt "$env:USERPROFILE\.codeium\windsurf\rules\bbddy.md" "Windsurf"
+Inject-Prompt "$env:USERPROFILE\.codex\instructions.md" "Codex CLI"
+Inject-Prompt "$env:USERPROFILE\.gemini\GEMINI.md" "Gemini CLI"
+
+Write-Host ""
+Write-Host "  ✅ bbddy installed!" -ForegroundColor Green
+Write-Host ""
+Write-Host "  Create your companion: bbddy_create tool or type /bbddy:create" -ForegroundColor Green
 Write-Host ""
