@@ -174,6 +174,51 @@ function Add-Statusline {
 
 # ── Other MCP clients ──
 
+function Add-Codex-Hooks {
+  $codexDir = "$env:USERPROFILE\.codex"
+  if (!(Test-Path $codexDir)) { return }
+  Ensure-Dir $codexDir
+
+  $configPath = "$codexDir\settings.json"
+  $raw = if (Test-Path $configPath) { Get-Content $configPath -Raw } else { '{}' }
+  if ($raw -match 'bbddy.*codex-session-start') {
+    Write-Host "  ✓ Codex hooks already registered" -ForegroundColor Green
+    return
+  }
+
+  node -e @"
+const fs = require('fs');
+const configFile = '$($configPath -replace '\\\\', '/')';
+const hooksDir   = '$($HOOKS_DIR_UNIX)';
+let config = {};
+try { config = JSON.parse(fs.readFileSync(configFile, 'utf-8')); } catch {}
+if (!config.hooks) config.hooks = {};
+
+function ensureHook(eventName, entry) {
+  if (!config.hooks[eventName]) config.hooks[eventName] = [];
+  const already = config.hooks[eventName].some(h => JSON.stringify(h).includes('bbddy'));
+  if (!already) config.hooks[eventName].push(entry);
+}
+
+ensureHook('SessionStart', { type: 'command', command: 'node ' + hooksDir + '/codex-session-start.mjs' });
+ensureHook('Stop',         { type: 'command', command: 'node ' + hooksDir + '/codex-stop.mjs' });
+ensureHook('PreToolUse',  { matcher: 'bash', hooks: [{ type: 'command', command: 'node ' + hooksDir + '/pre-tool-use.mjs' }] });
+ensureHook('PostToolUse', { matcher: 'bash', hooks: [{ type: 'command', command: 'node ' + hooksDir + '/post-tool-use.mjs' }] });
+
+fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
+"@ 2>$null
+  Write-Host "  ✓ Codex hooks registered" -ForegroundColor Green
+
+  # Plugin manifest
+  $codexPluginDir = "$codexDir\plugins\bbddy"
+  Ensure-Dir $codexPluginDir
+  $pluginSrc = "$INSTALL_DIR\.codex-plugin\plugin.json"
+  if ((Test-Path $pluginSrc) -and !(Test-Path "$codexPluginDir\plugin.json")) {
+    Copy-Item -Path $pluginSrc -Destination "$codexPluginDir\plugin.json" -Force
+    Write-Host "  ✓ Codex plugin manifest installed" -ForegroundColor Green
+  }
+}
+
 function Add-MCP-Client($configPath, $cliName) {
   $dir = Split-Path $configPath -Parent
   if (!(Test-Path $dir)) { return }
@@ -238,6 +283,7 @@ Add-MCP
 Add-MCP-Client "$env:USERPROFILE\.cursor\mcp.json" "Cursor"
 $windsurfDir = "$env:USERPROFILE\.codeium\windsurf"
 if (Test-Path "$env:USERPROFILE\.codeium") { Add-MCP-Client "$windsurfDir\mcp_config.json" "Windsurf" }
+Add-Codex-Hooks
 
 Write-Host ""
 Write-Host "  Registering hooks..."

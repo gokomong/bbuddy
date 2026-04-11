@@ -220,6 +220,62 @@ EOJSON
   echo -e "  ${GREEN}✓${NC} Cursor configured"
 }
 
+configure_codex() {
+  local config_file="$HOME/.codex/settings.json"
+  local codex_dir="$HOME/.codex"
+
+  if [ ! -d "$codex_dir" ]; then return; fi
+  mkdir -p "$codex_dir"
+
+  if grep -q 'bbddy.*codex-session-start' "$config_file" 2>/dev/null; then
+    echo -e "  ${GREEN}✓${NC} Codex hooks already registered"
+    return 0
+  fi
+
+  node -e "
+    const fs = require('fs');
+    const path = require('path');
+    const configFile = '$config_file';
+    const hooksDir = '$HOOKS_DIR';
+    const pluginSrc = '$INSTALL_DIR/.codex-plugin/plugin.json';
+
+    let config = {};
+    try { config = JSON.parse(fs.readFileSync(configFile, 'utf-8')); } catch {}
+    if (!config.hooks) config.hooks = {};
+
+    function ensureHook(eventName, entry) {
+      if (!config.hooks[eventName]) config.hooks[eventName] = [];
+      const already = config.hooks[eventName].some(h => JSON.stringify(h).includes('bbddy'));
+      if (!already) config.hooks[eventName].push(entry);
+    }
+
+    ensureHook('SessionStart', {
+      type: 'command', command: 'node ' + path.join(hooksDir, 'codex-session-start.mjs')
+    });
+    ensureHook('Stop', {
+      type: 'command', command: 'node ' + path.join(hooksDir, 'codex-stop.mjs')
+    });
+    ensureHook('PreToolUse', {
+      matcher: 'bash',
+      hooks: [{ type: 'command', command: 'node ' + path.join(hooksDir, 'pre-tool-use.mjs') }]
+    });
+    ensureHook('PostToolUse', {
+      matcher: 'bash',
+      hooks: [{ type: 'command', command: 'node ' + path.join(hooksDir, 'post-tool-use.mjs') }]
+    });
+
+    fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
+  " 2>/dev/null
+  echo -e "  ${GREEN}✓${NC} Codex hooks registered"
+
+  # Install plugin manifest
+  local codex_plugins_dir="$HOME/.codex/plugins/bbddy"
+  mkdir -p "$codex_plugins_dir"
+  [ -f "$INSTALL_DIR/.codex-plugin/plugin.json" ] && \
+    cp "$INSTALL_DIR/.codex-plugin/plugin.json" "$codex_plugins_dir/plugin.json" && \
+    echo -e "  ${GREEN}✓${NC} Codex plugin manifest installed"
+}
+
 configure_windsurf() {
   local config_file="$HOME/.codeium/windsurf/mcp_config.json"
   if [ ! -d "$HOME/.codeium" ]; then return; fi
@@ -287,6 +343,7 @@ echo "  Configuring MCP clients..."
 configure_claude_code_mcp
 configure_cursor
 configure_windsurf
+configure_codex
 
 echo ""
 echo "  Registering hooks..."

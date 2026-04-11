@@ -1,0 +1,26 @@
+{
+  "name": "bbddy",
+  "displayName": "bbddy — Create Your Companion",
+  "description": "Create and grow your own coding companion — AI ASCII generation, parts assembly, custom stats",
+  "version": "0.1.0",
+  "author": {
+    "name": "gokomong",
+    "url": "https://github.com/gokomong"
+  },
+  "skills": "skills",
+  "hooks": {
+    "SessionStart": "hooks/codex-session-start.mjs",
+    "Stop": "hooks/codex-stop.mjs",
+    "PreToolUse": {
+      "matcher": "bash",
+      "handler": "hooks/pre-tool-use.mjs"
+    },
+    "PostToolUse": {
+      "matcher": "bash",
+      "handler": "hooks/post-tool-use.mjs"
+    }
+  },
+  "mcp": {
+    "serverName": "bbddy"
+  }
+}
