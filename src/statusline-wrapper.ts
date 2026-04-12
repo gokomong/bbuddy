@@ -1,9 +1,68 @@
-import { execSync } from "child_process";
+import { execSync, execFileSync } from "child_process";
 import { readFileSync, readdirSync, writeFileSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
+import { homedir, platform } from "os";
 import { SPECIES_ANIMATIONS, SPRITE_BODIES, renderSprite } from "./lib/species.js";
 import { HAT_LINES, RARITY_ANSI, type Hat } from "./lib/types.js";
+
+// Braille Blank (U+2800) — visually empty but NOT treated as whitespace by
+// .trim(). Claude Code strips leading regular spaces on each statusline
+// row, so using Braille Blank for left padding is the only reliable way to
+// keep multi-line right-aligned content aligned across rows 2+.
+const PAD_CHAR = "\u2800";
+
+// Terminal width detection. Claude Code runs the statusline as a subprocess
+// with stdin redirected, so process.stdout.columns is undefined. We query
+// the host: PowerShell on Windows, stty on Unix. Result is cached to avoid
+// paying the ~400ms shell spawn on every render.
+const TERM_COLS_CACHE_PATH = join(homedir(), ".claude", "bbddy-term-cols.json");
+const TERM_COLS_CACHE_TTL = 10_000;
+const TERM_COLS_DEFAULT = 120;
+
+function detectTermColsUncached(): number {
+  const override = Number(process.env.BBDDY_TERM_COLS);
+  if (override > 0) return override;
+
+  try {
+    if (platform() === "win32") {
+      const out = execFileSync(
+        "powershell.exe",
+        ["-NoProfile", "-Command", "$Host.UI.RawUI.WindowSize.Width"],
+        { encoding: "utf-8", timeout: 1500, stdio: ["ignore", "pipe", "pipe"] },
+      ).trim();
+      const n = Number(out);
+      if (n > 40) return n;
+    } else {
+      const out = execSync("stty size 2>/dev/null < /dev/tty", {
+        encoding: "utf-8", timeout: 1000, shell: "/bin/sh",
+      }).trim();
+      const n = Number(out.split(/\s+/)[1]);
+      if (n > 40) return n;
+    }
+  } catch { /* fall through */ }
+
+  const envCols = Number(process.env.COLUMNS);
+  if (envCols > 40) return envCols;
+  return TERM_COLS_DEFAULT;
+}
+
+function detectTermCols(): number {
+  const override = Number(process.env.BBDDY_TERM_COLS);
+  if (override > 0) return override;
+
+  try {
+    const cache = JSON.parse(readFileSync(TERM_COLS_CACHE_PATH, "utf-8"));
+    if (Date.now() - cache.ts < TERM_COLS_CACHE_TTL && cache.cols > 0) {
+      return cache.cols;
+    }
+  } catch { /* no cache or stale */ }
+
+  const cols = detectTermColsUncached();
+  try {
+    writeFileSync(TERM_COLS_CACHE_PATH, JSON.stringify({ ts: Date.now(), cols }));
+  } catch { /* non-fatal */ }
+  return cols;
+}
 
 const RESET = "\x1b[0m";
 const DIM = "\x1b[2m";
@@ -263,14 +322,25 @@ if (buddyRight.length === 0) {
   const buddyVisibleWidths = buddyRight.map((l) => stripAnsi(l).length);
   const maxBuddyWidth = Math.max(...buddyVisibleWidths, 0);
   const gutter = 3;
-  const padWidth = maxHudWidth + gutter;
-  // When running as subprocess, process.stdout.columns is undefined — always use side-by-side
-  const termCols = process.stdout.columns;
-  const sideBySideWidth = maxHudWidth + gutter + maxBuddyWidth;
-  const useSideBySide = !termCols || sideBySideWidth <= termCols;
+  const termCols = detectTermCols();
+
+  // Right-align the buddy to the terminal edge while reserving MARGIN columns
+  // on the right for Claude Code's own footer elements like "◐ medium · /effort"
+  // (~18 chars wide). If bbddy lines overflow the terminal width, the terminal
+  // wraps them into the next visual row and clobbers the footer. Keeping a
+  // conservative margin prevents that wrap. Override with BBDDY_TERM_COLS if
+  // the detected width doesn't match Claude Code's actual usable area.
+  const MARGIN = Number(process.env.BBDDY_RIGHT_MARGIN) || 25;
+  const rightAlignedPad = termCols - maxBuddyWidth - MARGIN;
+  // Always keep the buddy at least 'gutter' columns to the right of the HUD
+  // so it never backs up over the HUD text.
+  const padWidth = Math.max(maxHudWidth + gutter, rightAlignedPad);
+  const sideBySideWidth = padWidth + maxBuddyWidth;
+  const useSideBySide = sideBySideWidth <= termCols;
 
   if (useSideBySide) {
-    // Side-by-side layout
+    // Side-by-side layout. Pad with Braille Blank so lines 2+ survive
+    // Claude Code's leading-whitespace trim.
     const totalLines = Math.max(hudLines.length, buddyRight.length);
     for (let i = 0; i < totalLines; i++) {
       const hudPart = hudLines[i] || "";
@@ -278,10 +348,8 @@ if (buddyRight.length === 0) {
 
       if (buddyPart) {
         const visibleLen = stripAnsi(hudPart).length;
-        const padding = " ".repeat(Math.max(0, padWidth - visibleLen));
-        // When hudPart is empty, prefix with RESET to prevent Claude Code from trimming leading spaces
-        const left = hudPart === "" ? `${RESET}${padding}` : `${hudPart}${padding}`;
-        console.log(`${left}${buddyPart}`);
+        const padding = PAD_CHAR.repeat(Math.max(0, padWidth - visibleLen));
+        console.log(`${hudPart}${padding}${buddyPart}`);
       } else {
         console.log(hudPart);
       }
