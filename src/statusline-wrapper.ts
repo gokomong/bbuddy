@@ -1,5 +1,5 @@
 import { execSync, execFileSync } from "child_process";
-import { readFileSync, readdirSync, writeFileSync } from "fs";
+import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { homedir, platform } from "os";
 import { SPECIES_ANIMATIONS, SPRITE_BODIES, renderSprite } from "./lib/species.js";
@@ -124,7 +124,6 @@ const YELLOW = "\x1b[33m";
 const GREEN = "\x1b[32m";
 const MAGENTA = "\x1b[35m";
 
-const toUnix = (p: string) => p.replace(/\\/g, "/");
 const BUDDY_STATUS_PATH = join(homedir(), ".claude", "bbuddy-status.json");
 const FRAME_INTERVAL_MS = 800;
 
@@ -207,75 +206,60 @@ function buildSpeechBubble(text: string, innerW = 28): { lines: string[]; connec
   return { lines, connectorIdx, width: innerW + 4 };
 }
 
-// Read stdin from Claude Code
+// Read stdin from Claude Code. Claude Code pipes a JSON payload with
+// session info (model, cost, context usage, rate limits) to every
+// statusline invocation; we use that to render our own small HUD so the
+// wrapper has zero dependency on external HUD plugins like OMC HUD or
+// claude-hud. Previous versions shelled out to those plugins, which made
+// bbuddy useless for anyone who didn't already install them.
 let stdinData = "";
 try {
   stdinData = readFileSync(0, "utf-8");
 } catch { /* no stdin */ }
 
-// Run claude-hud with caching (HUD data changes slowly, no need to re-run every render)
-const HUD_CACHE_PATH = join(homedir(), ".claude", "hud-cache.json");
-const HUD_CACHE_TTL = 10_000; // 10 seconds
+function formatDuration(ms: number): string {
+  if (!isFinite(ms) || ms < 0) return "";
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  if (h > 0) return `${h}h${m}m`;
+  return `${m}m`;
+}
 
-let hudLines: string[] = [];
-try {
-  // Try cache first
-  let cacheHit = false;
-  try {
-    const cache = JSON.parse(readFileSync(HUD_CACHE_PATH, "utf-8"));
-    if (Date.now() - cache.ts < HUD_CACHE_TTL && cache.lines) {
-      hudLines = cache.lines;
-      cacheHit = true;
-    }
-  } catch { /* no cache or stale */ }
+function buildInlineHud(stdin: string): string[] {
+  if (!stdin) return [];
+  let info: any;
+  try { info = JSON.parse(stdin); } catch { return []; }
+  if (!info || typeof info !== "object") return [];
 
-  if (!cacheHit) {
-    const configDir = process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude");
-    const cacheDir = join(configDir, "plugins", "cache", "claude-hud", "claude-hud");
+  const parts: string[] = [];
 
-    let pluginDir = "";
-    try {
-      const versions = readdirSync(cacheDir).sort((a, b) => {
-        const pa = a.split(".").map(Number);
-        const pb = b.split(".").map(Number);
-        for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-          if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) - (pb[i] || 0);
-        }
-        return 0;
-      });
-      if (versions.length > 0) {
-        pluginDir = join(cacheDir, versions[versions.length - 1]);
-      }
-    } catch { /* no claude-hud installed */ }
+  const modelName = info.model?.display_name || info.model?.id;
+  if (modelName) parts.push(`${CYAN}${modelName}${RESET}`);
 
-    if (pluginDir) {
-      const bunPath = process.env.BUN_PATH || 'bun';
-      const entryPoint = toUnix(join(pluginDir, "src", "index.ts"));
-      const result = execSync(
-        `"${bunPath}" --env-file /dev/null "${entryPoint}"`,
-        { input: stdinData, timeout: 5000, encoding: "utf-8", shell: "bash", stdio: ["pipe", "pipe", "pipe"] }
-      );
-      if (result) {
-        hudLines = result.trimEnd().split("\n");
-        // Write cache
-        try { writeFileSync(HUD_CACHE_PATH, JSON.stringify({ ts: Date.now(), lines: hudLines })); } catch { /* non-fatal */ }
-      }
-    } else {
-      // Fallback: try omc-hud.mjs if claude-hud plugin not found
-      const omcHudPath = join(homedir(), ".claude", "hud", "omc-hud.mjs");
-      try {
-        const result = execSync(
-          `node "${toUnix(omcHudPath)}"`,
-          { input: stdinData, timeout: 5000, encoding: "utf-8", shell: "bash", stdio: ["pipe", "pipe", "pipe"] }
-        );
-        if (result) {
-          hudLines = result.trimEnd().split("\n");
-          try { writeFileSync(HUD_CACHE_PATH, JSON.stringify({ ts: Date.now(), lines: hudLines })); } catch { /* non-fatal */ }
-        }
-      } catch { /* omc-hud not available */ }
-    }
+  const ctxPct = info.context_window?.used_percentage;
+  if (typeof ctxPct === "number") {
+    const color = ctxPct > 80 ? "\x1b[31m" : ctxPct > 50 ? YELLOW : GREEN;
+    parts.push(`${DIM}ctx:${RESET}${color}${Math.round(ctxPct)}%${RESET}`);
   }
-} catch { /* claude-hud failed */ }
+
+  const sessionDuration = info.cost?.total_duration_ms;
+  if (typeof sessionDuration === "number" && sessionDuration > 0) {
+    const formatted = formatDuration(sessionDuration);
+    if (formatted) parts.push(`${DIM}session:${RESET}${formatted}`);
+  }
+
+  const fiveHourPct = info.rate_limits?.five_hour?.used_percentage;
+  if (typeof fiveHourPct === "number") {
+    const color = fiveHourPct > 80 ? "\x1b[31m" : fiveHourPct > 50 ? YELLOW : GREEN;
+    parts.push(`${DIM}5h:${RESET}${color}${Math.round(fiveHourPct)}%${RESET}`);
+  }
+
+  if (parts.length === 0) return [];
+  return [parts.join(`${DIM} · ${RESET}`)];
+}
+
+const hudLines: string[] = buildInlineHud(stdinData);
 
 // Read buddy status
 let buddyRight: string[] = [];
