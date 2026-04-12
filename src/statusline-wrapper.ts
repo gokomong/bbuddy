@@ -206,60 +206,18 @@ function buildSpeechBubble(text: string, innerW = 28): { lines: string[]; connec
   return { lines, connectorIdx, width: innerW + 4 };
 }
 
-// Read stdin from Claude Code. Claude Code pipes a JSON payload with
-// session info (model, cost, context usage, rate limits) to every
-// statusline invocation; we use that to render our own small HUD so the
-// wrapper has zero dependency on external HUD plugins like OMC HUD or
-// claude-hud. Previous versions shelled out to those plugins, which made
-// bbuddy useless for anyone who didn't already install them.
+// Read stdin from Claude Code. We don't use the payload here — bbuddy
+// only renders the companion. Users who want a HUD alongside should run
+// their own statusline command that combines both outputs, or swap their
+// statusLine entirely. Reading stdin is still needed so Claude Code's
+// pipe doesn't fill up and block us.
 let stdinData = "";
 try {
   stdinData = readFileSync(0, "utf-8");
 } catch { /* no stdin */ }
+void stdinData;
 
-function formatDuration(ms: number): string {
-  if (!isFinite(ms) || ms < 0) return "";
-  const totalSec = Math.floor(ms / 1000);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  if (h > 0) return `${h}h${m}m`;
-  return `${m}m`;
-}
-
-function buildInlineHud(stdin: string): string[] {
-  if (!stdin) return [];
-  let info: any;
-  try { info = JSON.parse(stdin); } catch { return []; }
-  if (!info || typeof info !== "object") return [];
-
-  const parts: string[] = [];
-
-  const modelName = info.model?.display_name || info.model?.id;
-  if (modelName) parts.push(`${CYAN}${modelName}${RESET}`);
-
-  const ctxPct = info.context_window?.used_percentage;
-  if (typeof ctxPct === "number") {
-    const color = ctxPct > 80 ? "\x1b[31m" : ctxPct > 50 ? YELLOW : GREEN;
-    parts.push(`${DIM}ctx:${RESET}${color}${Math.round(ctxPct)}%${RESET}`);
-  }
-
-  const sessionDuration = info.cost?.total_duration_ms;
-  if (typeof sessionDuration === "number" && sessionDuration > 0) {
-    const formatted = formatDuration(sessionDuration);
-    if (formatted) parts.push(`${DIM}session:${RESET}${formatted}`);
-  }
-
-  const fiveHourPct = info.rate_limits?.five_hour?.used_percentage;
-  if (typeof fiveHourPct === "number") {
-    const color = fiveHourPct > 80 ? "\x1b[31m" : fiveHourPct > 50 ? YELLOW : GREEN;
-    parts.push(`${DIM}5h:${RESET}${color}${Math.round(fiveHourPct)}%${RESET}`);
-  }
-
-  if (parts.length === 0) return [];
-  return [parts.join(`${DIM} · ${RESET}`)];
-}
-
-const hudLines: string[] = buildInlineHud(stdinData);
+const hudLines: string[] = [];
 
 // Read buddy status
 let buddyRight: string[] = [];
