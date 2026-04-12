@@ -377,24 +377,30 @@ if (buddyRight.length === 0) {
   const gutter = 3;
   const termCols = detectTermCols();
 
-  // Pick padding. With a known terminal width we right-align the buddy,
-  // leaving MARGIN columns on the right for Claude Code's footer elements.
-  // Without a known width we just hug the HUD so we can't overshoot and
-  // clobber anything. Always keep the buddy at least `gutter` columns past
-  // the HUD so it never backs up over HUD text.
+  // Layout decision:
+  //   1. If we know the terminal width and HUD+gutter+buddy+margin fits,
+  //      right-align the buddy.
+  //   2. If we know the width but the HUD is too wide to fit alongside,
+  //      drop the HUD and right-align just the buddy. The buddy is the
+  //      thing the user wants to see — losing the HUD is the lesser evil.
+  //   3. If we don't know the width at all, hug the HUD with a fixed gutter.
   const MARGIN = Number(process.env.BBDDY_RIGHT_MARGIN) || 3;
   let padWidth: number;
-  let effectiveTermCols: number;
+  let dropHud = false;
   if (termCols !== null) {
-    const rightAlignedPad = termCols - maxBuddyWidth - MARGIN;
-    padWidth = Math.max(maxHudWidth + gutter, rightAlignedPad);
-    effectiveTermCols = termCols;
+    const fits = maxHudWidth + gutter + maxBuddyWidth + MARGIN <= termCols;
+    if (fits) {
+      const rightAlignedPad = termCols - maxBuddyWidth - MARGIN;
+      padWidth = Math.max(maxHudWidth + gutter, rightAlignedPad);
+    } else {
+      // Buddy-only mode: right-align the buddy and skip the HUD entirely.
+      dropHud = true;
+      padWidth = Math.max(0, termCols - maxBuddyWidth - MARGIN);
+    }
   } else {
     padWidth = maxHudWidth + gutter;
-    effectiveTermCols = padWidth + maxBuddyWidth;
   }
-  const sideBySideWidth = padWidth + maxBuddyWidth;
-  const useSideBySide = sideBySideWidth <= effectiveTermCols;
+  const useSideBySide = !dropHud;
 
   if (useSideBySide) {
     // Side-by-side layout. Pad with Braille Blank so lines 2+ survive
@@ -413,12 +419,11 @@ if (buddyRight.length === 0) {
       }
     }
   } else {
-    // Stacked layout — HUD on top, buddy below
-    for (const line of hudLines) {
-      console.log(line);
-    }
+    // Buddy-only mode: terminal too narrow for HUD + buddy. Drop the HUD
+    // and right-align the buddy by itself so it stays visible.
+    const padding = PAD_CHAR.repeat(padWidth);
     for (const line of buddyRight) {
-      console.log(line);
+      console.log(`${padding}${line}`);
     }
   }
 }
