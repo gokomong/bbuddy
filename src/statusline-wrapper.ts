@@ -1,9 +1,15 @@
-import { execSync } from "child_process";
+import { execSync, execFileSync } from "child_process";
 import { readFileSync, readdirSync, writeFileSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
+import { homedir, platform } from "os";
 import { SPECIES_ANIMATIONS, SPRITE_BODIES, renderSprite } from "./lib/species.js";
 import { HAT_LINES, RARITY_ANSI, type Hat } from "./lib/types.js";
+
+// Braille Blank (U+2800) — visually empty but NOT treated as whitespace by
+// JavaScript's .trim(). Claude Code's statusline renderer strips leading
+// regular spaces on each line, which wrecks right-aligned layouts. Braille
+// Blank survives the trim, so using it as padding keeps lines 2+ aligned.
+const PAD_CHAR = "\u2800";
 
 const RESET = "\x1b[0m";
 const DIM = "\x1b[2m";
@@ -28,20 +34,63 @@ try {
   stdinData = readFileSync(0, "utf-8");
 } catch { /* no stdin */ }
 
-// Determine terminal width. Claude Code does not pass columns directly via
-// stdin JSON, so we try a small chain: parsed stdin fields → COLUMNS env
-// var → a wide default that matches typical terminals.
-function detectTermCols(): number {
+// Terminal width detection. Claude Code runs the statusline as a subprocess
+// with stdin redirected, so process.stdout.columns is undefined and stty
+// can't reach the parent PTY. On Windows we ask PowerShell for the host
+// window size; on Unix we try stty via /dev/tty; otherwise we fall back to
+// the COLUMNS env var and finally a conservative default.
+//
+// PowerShell spawn is ~400ms, so we cache the result in a small file and
+// only refresh every 30 seconds. Terminal width almost never changes inside
+// a session, so this is effectively free after the first render.
+const TERM_COLS_CACHE_PATH = join(homedir(), ".claude", "bbddy-term-cols.json");
+const TERM_COLS_CACHE_TTL = 30_000;
+const TERM_COLS_DEFAULT = 120;
+
+function detectTermColsUncached(): number {
+  const override = Number(process.env.BBDDY_TERM_COLS);
+  if (override > 0) return override;
+
   try {
-    if (stdinData) {
-      const parsed = JSON.parse(stdinData);
-      const fromJson = parsed?.terminal?.columns ?? parsed?.terminal?.width ?? parsed?.cols ?? parsed?.columns;
-      if (typeof fromJson === 'number' && fromJson > 0) return fromJson;
+    if (platform() === "win32") {
+      const out = execFileSync(
+        "powershell.exe",
+        ["-NoProfile", "-Command", "$Host.UI.RawUI.WindowSize.Width"],
+        { encoding: "utf-8", timeout: 1500, stdio: ["ignore", "pipe", "pipe"] },
+      ).trim();
+      const n = Number(out);
+      if (n > 40) return n;
+    } else {
+      const out = execSync("stty size 2>/dev/null < /dev/tty", {
+        encoding: "utf-8", timeout: 1000, shell: "/bin/sh",
+      }).trim();
+      const n = Number(out.split(/\s+/)[1]);
+      if (n > 40) return n;
     }
-  } catch { /* not JSON */ }
+  } catch { /* fall through */ }
+
   const envCols = Number(process.env.COLUMNS);
-  if (envCols > 0) return envCols;
-  return 180;
+  if (envCols > 40) return envCols;
+  return TERM_COLS_DEFAULT;
+}
+
+function detectTermCols(): number {
+  // Explicit override bypasses the cache.
+  const override = Number(process.env.BBDDY_TERM_COLS);
+  if (override > 0) return override;
+
+  try {
+    const cache = JSON.parse(readFileSync(TERM_COLS_CACHE_PATH, "utf-8"));
+    if (Date.now() - cache.ts < TERM_COLS_CACHE_TTL && cache.cols > 0) {
+      return cache.cols;
+    }
+  } catch { /* no cache or stale */ }
+
+  const cols = detectTermColsUncached();
+  try {
+    writeFileSync(TERM_COLS_CACHE_PATH, JSON.stringify({ ts: Date.now(), cols }));
+  } catch { /* non-fatal */ }
+  return cols;
 }
 
 // Run claude-hud with caching (HUD data changes slowly, no need to re-run every render)
@@ -282,14 +331,17 @@ if (buddyRight.length === 0) {
   const termCols = detectTermCols();
   const minSideBySideWidth = maxHudWidth + gutter + maxBuddyWidth;
   const useSideBySide = minSideBySideWidth <= termCols;
-  // Right-align: push the buddy so its right edge lands near the terminal edge
-  // (one char of right margin so it doesn't kiss the border). Clamp so we
+  // Right-align: push the buddy so its right edge lands near the terminal
+  // edge, but leave MARGIN columns of breathing room for Claude Code's own
+  // footer elements like /effort / "accept edits" indicators. Clamp so we
   // never back up underneath the HUD.
-  const rightAlignedPad = termCols - maxBuddyWidth - 1;
+  const MARGIN = 8;
+  const rightAlignedPad = termCols - maxBuddyWidth - MARGIN;
   const padWidth = Math.max(maxHudWidth + gutter, rightAlignedPad);
 
   if (useSideBySide) {
-    // Side-by-side layout
+    // Side-by-side layout. Use Braille Blank padding so Claude Code's
+    // leading-whitespace trim keeps lines 2+ aligned with line 1.
     const totalLines = Math.max(hudLines.length, buddyRight.length);
     for (let i = 0; i < totalLines; i++) {
       const hudPart = hudLines[i] || "";
@@ -297,10 +349,8 @@ if (buddyRight.length === 0) {
 
       if (buddyPart) {
         const visibleLen = stripAnsi(hudPart).length;
-        const padding = " ".repeat(Math.max(0, padWidth - visibleLen));
-        // When hudPart is empty, prefix with RESET to prevent Claude Code from trimming leading spaces
-        const left = hudPart === "" ? `${RESET}${padding}` : `${hudPart}${padding}`;
-        console.log(`${left}${buddyPart}`);
+        const padding = PAD_CHAR.repeat(Math.max(0, padWidth - visibleLen));
+        console.log(`${hudPart}${padding}${buddyPart}`);
       } else {
         console.log(hudPart);
       }
