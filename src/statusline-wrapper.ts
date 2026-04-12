@@ -134,24 +134,59 @@ const FRAME_INTERVAL_MS = 800;
 // Strip ANSI codes for width calculation
 const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "");
 
+// Visual width in terminal cells. CJK and most emoji take 2 cells; ASCII
+// takes 1. Used so the speech bubble borders line up when the reaction
+// text contains Korean, Chinese, Japanese, or emoji.
+function visualWidth(s: string): number {
+  let w = 0;
+  for (const ch of s) {
+    const cp = ch.codePointAt(0);
+    if (cp === undefined) continue;
+    if (
+      (cp >= 0x1100 && cp <= 0x115F) ||  // Hangul Jamo
+      (cp >= 0x2E80 && cp <= 0x9FFF) ||  // CJK
+      (cp >= 0xA000 && cp <= 0xA4CF) ||  // Yi
+      (cp >= 0xAC00 && cp <= 0xD7A3) ||  // Hangul Syllables
+      (cp >= 0xF900 && cp <= 0xFAFF) ||  // CJK compat ideographs
+      (cp >= 0xFE30 && cp <= 0xFE4F) ||  // CJK compat forms
+      (cp >= 0xFF00 && cp <= 0xFF60) ||  // Fullwidth forms
+      (cp >= 0xFFE0 && cp <= 0xFFE6) ||  // Fullwidth signs
+      (cp >= 0x1F300 && cp <= 0x1F64F) || // Emoticons / misc symbols
+      (cp >= 0x1F680 && cp <= 0x1F6FF) || // Transport
+      (cp >= 0x1F900 && cp <= 0x1F9FF)    // Supplemental symbols
+    ) {
+      w += 2;
+    } else {
+      w += 1;
+    }
+  }
+  return w;
+}
+
 // Speech bubble — word-wrap + ASCII box, inspired by claude-buddy.
 // Returns the bubble lines (no ANSI), plus the index of the middle text row
 // so the renderer can place a `--` connector pointing at the buddy's mouth.
 function buildSpeechBubble(text: string, innerW = 28): { lines: string[]; connectorIdx: number; width: number } {
   if (!text) return { lines: [], connectorIdx: -1, width: 0 };
 
-  // Word wrap. Don't try to be clever with CJK width — just byte-wise wrap.
+  // Word wrap against the VISUAL width, not .length, so CJK/emoji are counted
+  // as 2 cells each. This keeps the bubble's right border vertically aligned.
   const words = text.split(/\s+/).filter(Boolean);
   const textLines: string[] = [];
   let cur = "";
+  let curW = 0;
   for (const word of words) {
+    const ww = visualWidth(word);
     if (!cur) {
       cur = word;
-    } else if (cur.length + 1 + word.length <= innerW) {
+      curW = ww;
+    } else if (curW + 1 + ww <= innerW) {
       cur = cur + " " + word;
+      curW += 1 + ww;
     } else {
       textLines.push(cur);
       cur = word;
+      curW = ww;
     }
   }
   if (cur) textLines.push(cur);
@@ -160,7 +195,7 @@ function buildSpeechBubble(text: string, innerW = 28): { lines: string[]; connec
   const border = "-".repeat(innerW + 2);
   const lines: string[] = [`.${border}.`];
   for (const tl of textLines) {
-    const pad = " ".repeat(Math.max(0, innerW - tl.length));
+    const pad = " ".repeat(Math.max(0, innerW - visualWidth(tl)));
     lines.push(`| ${tl}${pad} |`);
   }
   lines.push(`\`${border}'`);
