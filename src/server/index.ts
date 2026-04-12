@@ -485,6 +485,44 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
         },
       },
+      {
+        name: "bbddy_save",
+        description: "Save the current bbddy companion to a named slot so you can summon it back later. Slot name must be 1–24 chars.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            slot: { type: "string", description: "Slot name (1–24 chars). Reusing a slot overwrites it." },
+          },
+          required: ["slot"],
+        },
+      },
+      {
+        name: "bbddy_list",
+        description: "List all saved bbddy slots with names, species, levels, and a small art preview.",
+        inputSchema: { type: "object", properties: {} },
+      },
+      {
+        name: "bbddy_summon",
+        description: "Replace the current bbddy companion with the one saved in the named slot. The current companion is auto-backed up to a special '__previous' slot first so you can swap back.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            slot: { type: "string", description: "Slot name to summon." },
+          },
+          required: ["slot"],
+        },
+      },
+      {
+        name: "bbddy_dismiss",
+        description: "Permanently delete a saved bbddy slot. The currently active companion is unaffected.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            slot: { type: "string", description: "Slot name to delete." },
+          },
+          required: ["slot"],
+        },
+      },
     ],
   };
 });
@@ -924,6 +962,115 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     writeBuddyStatus(companion, undefined, row.id);
 
     return { content: [{ type: "text", text: `✨ ${row.name}의 외형이 바뀌었습니다! (${newSpecies})` }] };
+  }
+
+  // ─── Slot save/list/summon/dismiss ────────────────────────────────────────
+  // Slots let users keep multiple bbddy companions on hand and swap between
+  // them without losing state. Each slot stores a JSON snapshot of the
+  // companions row plus its custom_sprites row (if any). bbddy_summon
+  // auto-backs up the current companion to '__previous' before restoring.
+
+  if (name === "bbddy_save" || name === "bbddy_summon" || name === "bbddy_dismiss") {
+    const slotArg = (args as { slot?: string }).slot;
+    if (!slotArg || !slotArg.trim()) {
+      return { content: [{ type: "text", text: "⚠ slot 이름이 필요합니다." }] };
+    }
+    const slot = slotArg.trim();
+    if (slot.length > 24 || slot.length < 1) {
+      return { content: [{ type: "text", text: "⚠ slot 이름은 1–24자여야 합니다." }] };
+    }
+    if (name !== "bbddy_summon" && slot.startsWith("__")) {
+      return { content: [{ type: "text", text: "⚠ '__'로 시작하는 슬롯은 내부 예약입니다." }] };
+    }
+
+    if (name === "bbddy_save") {
+      const row = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
+      if (!row) {
+        return { content: [{ type: "text", text: "저장할 companion이 없습니다. bbddy_hatch 또는 bbddy_create로 먼저 만드세요." }] };
+      }
+      const sprite = db.prepare("SELECT * FROM custom_sprites WHERE companion_id = ?").get(row.id) as any;
+      db.prepare(
+        `INSERT OR REPLACE INTO companion_slots (slot_name, companion_data, custom_sprite, saved_at)
+         VALUES (?, ?, ?, datetime('now'))`,
+      ).run(slot, JSON.stringify(row), sprite ? JSON.stringify(sprite) : null);
+      return { content: [{ type: "text", text: `💾 "${row.name}"이(가) 슬롯 "${slot}"에 저장되었습니다.` }] };
+    }
+
+    if (name === "bbddy_summon") {
+      const slotRow = db.prepare("SELECT * FROM companion_slots WHERE slot_name = ?").get(slot) as any;
+      if (!slotRow) {
+        return { content: [{ type: "text", text: `슬롯 "${slot}"이(가) 없습니다. bbddy_list로 사용 가능한 슬롯을 확인하세요.` }] };
+      }
+
+      // Auto-backup the current companion to __previous so the swap is reversible.
+      const current = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
+      if (current) {
+        const currentSprite = db.prepare("SELECT * FROM custom_sprites WHERE companion_id = ?").get(current.id) as any;
+        db.prepare(
+          `INSERT OR REPLACE INTO companion_slots (slot_name, companion_data, custom_sprite, saved_at)
+           VALUES ('__previous', ?, ?, datetime('now'))`,
+        ).run(JSON.stringify(current), currentSprite ? JSON.stringify(currentSprite) : null);
+
+        // Drop the current companion's rows so the new one takes over.
+        db.prepare("DELETE FROM custom_sprites WHERE companion_id = ?").run(current.id);
+        db.prepare("DELETE FROM companions WHERE id = ?").run(current.id);
+      }
+
+      // Restore from slot. Reuse the original companion id so xp/memory FKs
+      // line up if the slot was previously summoned and saved again.
+      const data = JSON.parse(slotRow.companion_data);
+      const cols = Object.keys(data);
+      const placeholders = cols.map(() => "?").join(",");
+      db.prepare(`INSERT INTO companions (${cols.join(",")}) VALUES (${placeholders})`)
+        .run(...cols.map((c) => data[c]));
+
+      if (slotRow.custom_sprite) {
+        const sprite = JSON.parse(slotRow.custom_sprite);
+        const sCols = Object.keys(sprite);
+        const sPlace = sCols.map(() => "?").join(",");
+        db.prepare(`INSERT OR REPLACE INTO custom_sprites (${sCols.join(",")}) VALUES (${sPlace})`)
+          .run(...sCols.map((c) => sprite[c]));
+      }
+
+      const restored = db.prepare("SELECT * FROM companions WHERE id = ?").get(data.id) as any;
+      const companion = loadCompanion(restored)!;
+      writeBuddyStatus(companion, undefined, restored.id);
+
+      return { content: [{ type: "text", text: `✨ "${companion.name}"이(가) 슬롯 "${slot}"에서 소환되었습니다. (이전 companion은 '__previous'에 백업됨)` }] };
+    }
+
+    if (name === "bbddy_dismiss") {
+      const slotRow = db.prepare("SELECT slot_name FROM companion_slots WHERE slot_name = ?").get(slot) as any;
+      if (!slotRow) {
+        return { content: [{ type: "text", text: `슬롯 "${slot}"이(가) 없습니다.` }] };
+      }
+      db.prepare("DELETE FROM companion_slots WHERE slot_name = ?").run(slot);
+      return { content: [{ type: "text", text: `🗑 슬롯 "${slot}" 삭제 완료.` }] };
+    }
+  }
+
+  if (name === "bbddy_list") {
+    const slots = db.prepare(
+      "SELECT slot_name, companion_data, saved_at FROM companion_slots ORDER BY saved_at DESC",
+    ).all() as Array<{ slot_name: string; companion_data: string; saved_at: string }>;
+
+    if (slots.length === 0) {
+      return { content: [{ type: "text", text: "저장된 슬롯이 없습니다. bbddy_save로 현재 companion을 저장하세요." }] };
+    }
+
+    const lines = ["저장된 bbddy 슬롯:", ""];
+    for (const s of slots) {
+      try {
+        const data = JSON.parse(s.companion_data);
+        const tag = s.slot_name === "__previous" ? " (auto-backup)" : "";
+        lines.push(`  • ${s.slot_name}${tag} — ${data.name} (${data.species}) Lv.${data.level}  · ${s.saved_at}`);
+      } catch {
+        lines.push(`  • ${s.slot_name} — (corrupted)`);
+      }
+    }
+    lines.push("");
+    lines.push("bbddy_summon { slot: \"<name>\" } 으로 불러오세요.");
+    return { content: [{ type: "text", text: lines.join("\n") }] };
   }
 
   throw new Error(`Tool not found: ${name}`);

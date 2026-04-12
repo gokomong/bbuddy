@@ -82,6 +82,13 @@ export function initDb() {
       updated_at    TEXT DEFAULT (datetime('now')),
       FOREIGN KEY(companion_id) REFERENCES companions(id)
     );
+
+    CREATE TABLE IF NOT EXISTS companion_slots (
+      slot_name      TEXT PRIMARY KEY,
+      companion_data TEXT NOT NULL,
+      custom_sprite  TEXT,
+      saved_at       TEXT DEFAULT (datetime('now'))
+    );
   `);
 
   // bbddy schema migrations — safe to run on existing DBs
