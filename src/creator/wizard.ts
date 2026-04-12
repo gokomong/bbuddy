@@ -5,6 +5,98 @@ import { SPECIES_LIST } from '../lib/species.js';
 import { PERSONALITY_PRESETS, STAT_NAMES } from '../lib/types.js';
 import { PRESETS } from './presets.js';
 import { validateStatDistribution, STAT_POOL, STAT_MIN, STAT_MAX } from './stats.js';
+import { getLang } from '../i18n/index.js';
+
+// Wizard string catalog. English is the default; Korean is selected when
+// the user runs `bbddy_language ko`.
+const WIZARD_STRINGS = {
+  en: {
+    title: '/bbddy:create wizard',
+    stepName: '[1/4] Choose a name',
+    namePrompt: 'Give your buddy a name.',
+    nameExample: 'e.g., Mochi, Zyx, Pixel, Grumpf',
+    stepAppearance: '[2/4] Build appearance',
+    name: 'Name',
+    chooseAppearanceMode: 'Pick an appearance mode (appearance_mode parameter):',
+    mode1Label: '1  Species      Pick from 21 built-in species',
+    mode2Label: '2  Parts mix    Combine face + eye + accessory + body',
+    mode3Label: '3  AI generate  Prompt → host LLM (Claude Code / Codex) draws ASCII',
+    mode4Label: '4  Manual       Type the ASCII art yourself',
+    mode1Title: '[2/4] Appearance — Species',
+    mode1Prompt: 'Pick a species (species parameter):',
+    mode2Title: '[2/4] Appearance — Parts mix',
+    mode2Prompt: 'Set all four parts on the parts parameter:',
+    mode2Face: 'face:      round / square / pointy / blob',
+    mode2Eye: 'eye:       · o O ^ > - * ♥ x ■ (or any character)',
+    mode2Accessory: 'accessory: none / hat / crown / horns / ears / halo / antenna / bow',
+    mode2Body: 'body:      none / arms / tiny / legs / tail / float',
+    mode2Current: 'Current:',
+    unset: '(not set)',
+    mode3Title: '[2/4] Appearance — AI generate',
+    mode3Prompt: 'Set the ai_prompt parameter to a short character description.',
+    mode3Examples: 'Examples:',
+    mode3Ex1: '"hacker cat with sunglasses"',
+    mode3Ex2: '"sleepy bear"',
+    mode3Ex3: '"frog wearing a crown"',
+    mode3Note: 'The host LLM (Claude Code / Codex) draws the art. No API key required.',
+    mode4Title: '[2/4] Appearance — Manual',
+    mode4Prompt: 'Set manual_frame1 to newline-separated lines.',
+    mode4Limit: '(max 6 rows, max 14 chars per row)',
+    mode4Ex1: 'manual_frame1: "/\\_/\\\\n( ·.· )\\n > ~ <"',
+    mode4Note: 'manual_frame2 and manual_frame3 are optional (auto-generated if omitted).',
+    personalityTitle: '[3/4] Personality',
+    personalityPrompt: 'Pick a personality preset (personality_preset parameter):',
+    personalityCustom: 'If you pick custom, also set custom_prompt with a free-form description.',
+    statsTitle: (pool: number) => `[4/4] Distribute stats (total ${pool}pt)`,
+    statsPrompt: 'Spread your points across the 5 stats on the stats parameter.',
+    statsLimit: (min: number, max: number) => `Each stat: min ${min} ~ max ${max}`,
+    statsExample: 'Example: { DEBUGGING: 40, PATIENCE: 25, CHAOS: 10, WISDOM: 15, SNARK: 10 }',
+    previewConfirm: 'Happy with this buddy? Call the tool again with confirm: true to finalize. Change params and re-call to go back.',
+  },
+  ko: {
+    title: '/bbddy:create wizard',
+    stepName: '[1/4] 이름 짓기',
+    namePrompt: '버디의 이름을 지어주세요.',
+    nameExample: '예: Mochi, Zyx, Pixel, Grumpf',
+    stepAppearance: '[2/4] 외형 만들기',
+    name: '이름',
+    chooseAppearanceMode: '외형 모드를 선택하세요 (appearance_mode 파라미터):',
+    mode1Label: '1  기본 종족     기존 21종 중 선택',
+    mode2Label: '2  파츠 조합     얼굴+눈+악세+몸통 모듈 조합',
+    mode3Label: '3  AI로 생성     프롬프트 → 호스트 LLM(Claude Code/Codex)이 ASCII 생성',
+    mode4Label: '4  직접 타이핑   한 줄씩 직접 입력',
+    mode1Title: '[2/4] 외형 — 기본 종족',
+    mode1Prompt: '종족을 선택하세요 (species 파라미터):',
+    mode2Title: '[2/4] 외형 — 파츠 조합',
+    mode2Prompt: 'parts 파라미터에 4가지를 지정하세요:',
+    mode2Face: 'face:      round / square / pointy / blob',
+    mode2Eye: 'eye:       · o O ^ > - * ♥ x ■ (또는 자유 입력)',
+    mode2Accessory: 'accessory: none / hat / crown / horns / ears / halo / antenna / bow',
+    mode2Body: 'body:      none / arms / tiny / legs / tail / float',
+    mode2Current: '현재 선택:',
+    unset: '(미선택)',
+    mode3Title: '[2/4] 외형 — AI 생성',
+    mode3Prompt: 'ai_prompt 파라미터에 캐릭터 설명을 입력하세요.',
+    mode3Examples: '예시:',
+    mode3Ex1: '"선글라스 쓴 해커 고양이"',
+    mode3Ex2: '"졸린 표정의 곰"',
+    mode3Ex3: '"왕관 쓴 개구리"',
+    mode3Note: '호스트 LLM(Claude Code / Codex)이 직접 그림을 만듭니다. 별도 API 키 불필요.',
+    mode4Title: '[2/4] 외형 — 직접 입력',
+    mode4Prompt: 'manual_frame1 파라미터에 \\n으로 구분해서 입력하세요.',
+    mode4Limit: '(최대 6줄, 줄당 최대 14자)',
+    mode4Ex1: 'manual_frame1: "/\\_/\\\\n( ·.· )\\n > ~ <"',
+    mode4Note: 'manual_frame2, manual_frame3 은 선택 (없으면 자동 생성)',
+    personalityTitle: '[3/4] 성격 설정',
+    personalityPrompt: '성격 프리셋을 선택하세요 (personality_preset 파라미터):',
+    personalityCustom: 'custom 선택 시 custom_prompt 파라미터에 성격 설명 입력',
+    statsTitle: (pool: number) => `[4/4] 스탯 분배 (합계 ${pool}pt)`,
+    statsPrompt: 'stats 파라미터에 5개 스탯을 배분하세요.',
+    statsLimit: (min: number, max: number) => `각 스탯: 최소 ${min} ~ 최대 ${max}`,
+    statsExample: '예시: { DEBUGGING: 40, PATIENCE: 25, CHAOS: 10, WISDOM: 15, SNARK: 10 }',
+    previewConfirm: '캐릭터가 마음에 드시나요? confirm: true 로 호출하면 확정됩니다. 뒤로 가려면 파라미터를 수정해서 다시 호출하세요.',
+  },
+};
 
 export type AppearanceMode = '1' | '2' | '3' | '4';
 
@@ -113,6 +205,7 @@ export function evaluateWizardState(args: WizardArgs): WizardState {
 }
 
 export function renderWizardPrompt(state: WizardState, args: WizardArgs): string {
+  const M = WIZARD_STRINGS[getLang()];
   const STEPS = ['name', 'appearance', 'personality', 'stats'];
   const progress = STEPS.map(s => {
     const done = state.completed.includes(s);
@@ -123,7 +216,7 @@ export function renderWizardPrompt(state: WizardState, args: WizardArgs): string
 
   const lines: string[] = [
     `╔══════════════════════════════╗`,
-    `║   /bbddy:create wizard       ║`,
+    `║   ${M.title.padEnd(26)} ║`,
     `╚══════════════════════════════╝`,
     ``,
     `  ${progress}`,
@@ -131,29 +224,29 @@ export function renderWizardPrompt(state: WizardState, args: WizardArgs): string
   ];
 
   if (state.step === 'name') {
-    lines.push(`  [1/4] 이름 짓기`);
+    lines.push(`  ${M.stepName}`);
     lines.push(`  ──────────────────────────────`);
-    lines.push(`  버디의 이름을 지어주세요.`);
-    lines.push(`  예: Mochi, Zyx, Pixel, Grumpf`);
+    lines.push(`  ${M.namePrompt}`);
+    lines.push(`  ${M.nameExample}`);
 
   } else if (state.step === 'appearance_mode') {
-    lines.push(`  [2/4] 외형 만들기`);
+    lines.push(`  ${M.stepAppearance}`);
     lines.push(`  ──────────────────────────────`);
-    lines.push(`  이름: ${args.name}`);
+    lines.push(`  ${M.name}: ${args.name}`);
     lines.push(``);
-    lines.push(`  외형 모드를 선택하세요 (appearance_mode 파라미터):`);
+    lines.push(`  ${M.chooseAppearanceMode}`);
     lines.push(``);
-    lines.push(`  1  기본 종족     기존 21종 중 선택`);
-    lines.push(`  2  파츠 조합     얼굴+눈+악세+몸통 모듈 조합`);
-    lines.push(`  3  AI로 생성     프롬프트 → 호스트 LLM(Claude Code/Codex)이 ASCII 생성`);
-    lines.push(`  4  직접 타이핑   한 줄씩 직접 입력`);
+    lines.push(`  ${M.mode1Label}`);
+    lines.push(`  ${M.mode2Label}`);
+    lines.push(`  ${M.mode3Label}`);
+    lines.push(`  ${M.mode4Label}`);
 
   } else if (state.step === 'species') {
-    lines.push(`  [2/4] 외형 — 기본 종족`);
+    lines.push(`  ${M.mode1Title}`);
     lines.push(`  ──────────────────────────────`);
-    lines.push(`  이름: ${args.name}`);
+    lines.push(`  ${M.name}: ${args.name}`);
     lines.push(``);
-    lines.push(`  종족을 선택하세요 (species 파라미터):`);
+    lines.push(`  ${M.mode1Prompt}`);
     lines.push(``);
     const cols = 3;
     for (let i = 0; i < SPECIES_LIST.length; i += cols) {
@@ -163,80 +256,80 @@ export function renderWizardPrompt(state: WizardState, args: WizardArgs): string
 
   } else if (state.step === 'parts') {
     const p = args.parts ?? {};
-    lines.push(`  [2/4] 외형 — 파츠 조합`);
+    lines.push(`  ${M.mode2Title}`);
     lines.push(`  ──────────────────────────────`);
-    lines.push(`  이름: ${args.name}`);
+    lines.push(`  ${M.name}: ${args.name}`);
     lines.push(``);
-    lines.push(`  parts 파라미터에 4가지를 지정하세요:`);
+    lines.push(`  ${M.mode2Prompt}`);
     lines.push(``);
-    lines.push(`  face:      round / square / pointy / blob`);
-    lines.push(`  eye:       · o O ^ > - * ♥ x ■ (또는 자유 입력)`);
-    lines.push(`  accessory: none / hat / crown / horns / ears / halo / antenna / bow`);
-    lines.push(`  body:      none / arms / tiny / legs / tail / float`);
+    lines.push(`  ${M.mode2Face}`);
+    lines.push(`  ${M.mode2Eye}`);
+    lines.push(`  ${M.mode2Accessory}`);
+    lines.push(`  ${M.mode2Body}`);
     lines.push(``);
-    lines.push(`  현재 선택:`);
-    lines.push(`    face: ${p.face ?? '(미선택)'}  eye: ${p.eye ?? '(미선택)'}`);
-    lines.push(`    accessory: ${p.accessory ?? '(미선택)'}  body: ${p.body ?? '(미선택)'}`);
+    lines.push(`  ${M.mode2Current}`);
+    lines.push(`    face: ${p.face ?? M.unset}  eye: ${p.eye ?? M.unset}`);
+    lines.push(`    accessory: ${p.accessory ?? M.unset}  body: ${p.body ?? M.unset}`);
 
   } else if (state.step === 'ai_prompt') {
-    lines.push(`  [2/4] 외형 — AI 생성`);
+    lines.push(`  ${M.mode3Title}`);
     lines.push(`  ──────────────────────────────`);
-    lines.push(`  이름: ${args.name}`);
+    lines.push(`  ${M.name}: ${args.name}`);
     lines.push(``);
-    lines.push(`  ai_prompt 파라미터에 캐릭터 설명을 입력하세요.`);
+    lines.push(`  ${M.mode3Prompt}`);
     lines.push(``);
-    lines.push(`  예시:`);
-    lines.push(`    "선글라스 쓴 해커 고양이"`);
-    lines.push(`    "졸린 표정의 곰"`);
-    lines.push(`    "왕관 쓴 개구리"`);
+    lines.push(`  ${M.mode3Examples}`);
+    lines.push(`    ${M.mode3Ex1}`);
+    lines.push(`    ${M.mode3Ex2}`);
+    lines.push(`    ${M.mode3Ex3}`);
     lines.push(``);
-    lines.push(`  호스트 LLM(Claude Code / Codex)이 직접 그림을 만듭니다. 별도 API 키 불필요.`);
+    lines.push(`  ${M.mode3Note}`);
 
   } else if (state.step === 'manual') {
-    lines.push(`  [2/4] 외형 — 직접 입력`);
+    lines.push(`  ${M.mode4Title}`);
     lines.push(`  ──────────────────────────────`);
-    lines.push(`  이름: ${args.name}`);
+    lines.push(`  ${M.name}: ${args.name}`);
     lines.push(``);
-    lines.push(`  manual_frame1 파라미터에 \\n으로 구분해서 입력하세요.`);
-    lines.push(`  (최대 6줄, 줄당 최대 14자)`);
+    lines.push(`  ${M.mode4Prompt}`);
+    lines.push(`  ${M.mode4Limit}`);
     lines.push(``);
-    lines.push(`  예시:`);
-    lines.push(`    manual_frame1: "/\\_/\\\\n( ·.· )\\n > ~ <"`);
+    lines.push(`  ${M.mode3Examples}`);
+    lines.push(`    ${M.mode4Ex1}`);
     lines.push(``);
-    lines.push(`  manual_frame2, manual_frame3 은 선택 (없으면 자동 생성)`);
+    lines.push(`  ${M.mode4Note}`);
 
   } else if (state.step === 'personality') {
-    lines.push(`  [3/4] 성격 설정`);
+    lines.push(`  ${M.personalityTitle}`);
     lines.push(`  ──────────────────────────────`);
-    lines.push(`  이름: ${args.name}`);
+    lines.push(`  ${M.name}: ${args.name}`);
     lines.push(``);
-    lines.push(`  성격 프리셋을 선택하세요 (personality_preset 파라미터):`);
+    lines.push(`  ${M.personalityPrompt}`);
     lines.push(``);
     for (const [, def] of Object.entries(PRESETS)) {
       lines.push(`  ${def.id.padEnd(12)} ${def.label.padEnd(8)} ${def.description}`);
     }
     lines.push(``);
-    lines.push(`  custom 선택 시 custom_prompt 파라미터에 성격 설명 입력`);
+    lines.push(`  ${M.personalityCustom}`);
 
   } else if (state.step === 'stats') {
     const statsErr = args.stats ? validateStatDistribution(args.stats) : null;
-    lines.push(`  [4/4] 스탯 분배 (합계 ${STAT_POOL}pt)`);
+    lines.push(`  ${M.statsTitle(STAT_POOL)}`);
     lines.push(`  ──────────────────────────────`);
-    lines.push(`  이름: ${args.name}`);
+    lines.push(`  ${M.name}: ${args.name}`);
     lines.push(``);
-    lines.push(`  stats 파라미터에 5개 스탯을 배분하세요.`);
-    lines.push(`  각 스탯: 최소 ${STAT_MIN} ~ 최대 ${STAT_MAX}`);
+    lines.push(`  ${M.statsPrompt}`);
+    lines.push(`  ${M.statsLimit(STAT_MIN, STAT_MAX)}`);
     lines.push(``);
     for (const stat of STAT_NAMES) {
       const cur = args.stats?.[stat];
-      lines.push(`  ${stat.padEnd(12)} ${cur !== undefined ? String(cur) : '(미설정)'}`);
+      lines.push(`  ${stat.padEnd(12)} ${cur !== undefined ? String(cur) : M.unset}`);
     }
     if (statsErr && !statsErr.valid) {
       lines.push(``);
       lines.push(`  ⚠ ${statsErr.error}`);
     }
     lines.push(``);
-    lines.push(`  예시: { DEBUGGING: 40, PATIENCE: 25, CHAOS: 10, WISDOM: 15, SNARK: 10 }`);
+    lines.push(`  ${M.statsExample}`);
   }
 
   return lines.join('\n');

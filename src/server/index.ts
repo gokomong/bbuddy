@@ -23,6 +23,8 @@ import { generatePresetBio, PRESETS } from "../creator/presets.js";
 import { validateStatDistribution, normaliseStats } from "../creator/stats.js";
 import { combineParts, type PartsSelection } from "../creator/parts-combiner.js";
 import { parseManualInput } from "../creator/manual-input.js";
+import { getLang, setLang, SUPPORTED_LANGS, type Lang } from "../i18n/index.js";
+import { serverMessages } from "../i18n/server.js";
 import { randomUUID } from "crypto";
 import { writeFileSync, mkdirSync, unlinkSync } from "fs";
 import { join } from "path";
@@ -236,25 +238,26 @@ function buildAiDelegationPrompt(
     null,
     2,
   );
+  const M = serverMessages();
   return [
-    `🎨 AI 모드 — 호스트 모델이 직접 ASCII 아트를 그립니다.`,
+    M.aiHeader(tool),
     ``,
-    `캐릭터 설명: "${description}"`,
+    M.aiDescription(description),
     ``,
-    `제약:`,
-    `- 최대 6줄, 줄당 최대 14자`,
-    `- ASCII + 유니코드 문자만 사용 (이모지는 지양)`,
-    `- frame1 = idle, frame2 = blink/wink, frame3 = expression (wiggle/stretch 등)`,
-    `- 세 프레임 모두 같은 실루엣, 눈/입/팔 같은 세부만 살짝 다르게`,
+    M.aiConstraints,
+    M.aiConstraint1,
+    M.aiConstraint2,
+    M.aiConstraint3,
+    M.aiConstraint4,
     ``,
-    `다음 단계: 위 제약에 맞게 3개 프레임을 만들고, 바로 ${tool}을 아래 형태로 다시 호출하세요:`,
+    M.aiNext(tool),
     ``,
     '```json',
     callTemplate,
     '```',
     ``,
-    `프레임 문자열에는 실제 줄바꿈 또는 "\\n" 이스케이프 시퀀스를 써도 됩니다.`,
-    `confirm을 붙이지 않으면 미리보기만 보여줍니다.`,
+    M.aiFrameHint,
+    M.aiConfirmHint,
   ].join('\n');
 }
 
@@ -305,6 +308,7 @@ function writeBuddyStatus(
       stats: companion.stats,
       rarity_stars: RARITY_STARS[companion.rarity],
       personality_bio: companion.personalityBio,
+      language: getLang(),
       ...(customIdleFrames ? { custom_idle_frames: customIdleFrames } : {}),
       ...(reaction ? {
         reaction: reaction.state,
@@ -521,6 +525,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             slot: { type: "string", description: "Slot name to delete." },
           },
           required: ["slot"],
+        },
+      },
+      {
+        name: "bbddy_language",
+        description: "Set or show the bbddy UI language. English ('en') is the default; pass 'ko' for Korean. Omit lang to see the current setting.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            lang: { type: "string", enum: ["en", "ko"], description: "Language code. Omit to show current." },
+          },
         },
       },
     ],
@@ -846,7 +860,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       return {
         content: [{
           type: "text",
-          text: `${preview}\n\n캐릭터가 마음에 드시나요? confirm: true 로 호출하면 확정됩니다.\n뒤로 가려면 파라미터를 수정해서 다시 호출하세요.`,
+          text: `${preview}\n\n${serverMessages().previewAsk}`,
         }],
       };
     }
@@ -854,7 +868,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // Confirmed — check no existing companion
     const existing = db.prepare("SELECT id FROM companions LIMIT 1").get() as any;
     if (existing) {
-      return { content: [{ type: "text", text: "이미 companion이 있습니다. bbddy_respawn으로 해제한 뒤 다시 시도하세요." }] };
+      return { content: [{ type: "text", text: serverMessages().existingCompanion }] };
     }
 
     const id = randomUUID();
@@ -942,7 +956,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     if (!evolveArgs.confirm) {
       const previewFrame = newCustomSprite?.idleFrames[0];
       const previewLines = previewFrame ? previewFrame.join('\n') : `Species: ${newSpecies}`;
-      return { content: [{ type: "text", text: `새 외형 미리보기:\n\n${previewLines}\n\nconfirm: true 로 적용하세요.` }] };
+      return { content: [{ type: "text", text: serverMessages().evolvePreview(previewLines) }] };
     }
 
     // Apply
@@ -961,7 +975,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const companion = loadCompanion(updated)!;
     writeBuddyStatus(companion, undefined, row.id);
 
-    return { content: [{ type: "text", text: `✨ ${row.name}의 외형이 바뀌었습니다! (${newSpecies})` }] };
+    return { content: [{ type: "text", text: serverMessages().evolveDone(row.name, newSpecies) }] };
   }
 
   // ─── Slot save/list/summon/dismiss ────────────────────────────────────────
@@ -971,35 +985,36 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   // auto-backs up the current companion to '__previous' before restoring.
 
   if (name === "bbddy_save" || name === "bbddy_summon" || name === "bbddy_dismiss") {
+    const M = serverMessages();
     const slotArg = (args as { slot?: string }).slot;
     if (!slotArg || !slotArg.trim()) {
-      return { content: [{ type: "text", text: "⚠ slot 이름이 필요합니다." }] };
+      return { content: [{ type: "text", text: M.slotNameRequired }] };
     }
     const slot = slotArg.trim();
     if (slot.length > 24 || slot.length < 1) {
-      return { content: [{ type: "text", text: "⚠ slot 이름은 1–24자여야 합니다." }] };
+      return { content: [{ type: "text", text: M.slotNameLength }] };
     }
     if (name !== "bbddy_summon" && slot.startsWith("__")) {
-      return { content: [{ type: "text", text: "⚠ '__'로 시작하는 슬롯은 내부 예약입니다." }] };
+      return { content: [{ type: "text", text: M.slotReserved }] };
     }
 
     if (name === "bbddy_save") {
       const row = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
       if (!row) {
-        return { content: [{ type: "text", text: "저장할 companion이 없습니다. bbddy_hatch 또는 bbddy_create로 먼저 만드세요." }] };
+        return { content: [{ type: "text", text: M.noCompanionToSave }] };
       }
       const sprite = db.prepare("SELECT * FROM custom_sprites WHERE companion_id = ?").get(row.id) as any;
       db.prepare(
         `INSERT OR REPLACE INTO companion_slots (slot_name, companion_data, custom_sprite, saved_at)
          VALUES (?, ?, ?, datetime('now'))`,
       ).run(slot, JSON.stringify(row), sprite ? JSON.stringify(sprite) : null);
-      return { content: [{ type: "text", text: `💾 "${row.name}"이(가) 슬롯 "${slot}"에 저장되었습니다.` }] };
+      return { content: [{ type: "text", text: M.slotSaved(row.name, slot) }] };
     }
 
     if (name === "bbddy_summon") {
       const slotRow = db.prepare("SELECT * FROM companion_slots WHERE slot_name = ?").get(slot) as any;
       if (!slotRow) {
-        return { content: [{ type: "text", text: `슬롯 "${slot}"이(가) 없습니다. bbddy_list로 사용 가능한 슬롯을 확인하세요.` }] };
+        return { content: [{ type: "text", text: M.slotMissing(slot) }] };
       }
 
       // Auto-backup the current companion to __previous so the swap is reversible.
@@ -1036,41 +1051,56 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const companion = loadCompanion(restored)!;
       writeBuddyStatus(companion, undefined, restored.id);
 
-      return { content: [{ type: "text", text: `✨ "${companion.name}"이(가) 슬롯 "${slot}"에서 소환되었습니다. (이전 companion은 '__previous'에 백업됨)` }] };
+      return { content: [{ type: "text", text: M.summoned(companion.name, slot) }] };
     }
 
     if (name === "bbddy_dismiss") {
       const slotRow = db.prepare("SELECT slot_name FROM companion_slots WHERE slot_name = ?").get(slot) as any;
       if (!slotRow) {
-        return { content: [{ type: "text", text: `슬롯 "${slot}"이(가) 없습니다.` }] };
+        return { content: [{ type: "text", text: M.slotDeleteMissing(slot) }] };
       }
       db.prepare("DELETE FROM companion_slots WHERE slot_name = ?").run(slot);
-      return { content: [{ type: "text", text: `🗑 슬롯 "${slot}" 삭제 완료.` }] };
+      return { content: [{ type: "text", text: M.slotDeleted(slot) }] };
     }
   }
 
   if (name === "bbddy_list") {
+    const M = serverMessages();
     const slots = db.prepare(
       "SELECT slot_name, companion_data, saved_at FROM companion_slots ORDER BY saved_at DESC",
     ).all() as Array<{ slot_name: string; companion_data: string; saved_at: string }>;
 
     if (slots.length === 0) {
-      return { content: [{ type: "text", text: "저장된 슬롯이 없습니다. bbddy_save로 현재 companion을 저장하세요." }] };
+      return { content: [{ type: "text", text: M.noSlots }] };
     }
 
-    const lines = ["저장된 bbddy 슬롯:", ""];
+    const lines = [M.noSlotsHeader, ""];
     for (const s of slots) {
       try {
         const data = JSON.parse(s.companion_data);
-        const tag = s.slot_name === "__previous" ? " (auto-backup)" : "";
-        lines.push(`  • ${s.slot_name}${tag} — ${data.name} (${data.species}) Lv.${data.level}  · ${s.saved_at}`);
+        const tag = s.slot_name === "__previous" ? M.slotAutoBackupTag : "";
+        lines.push(M.slotLine(s.slot_name, tag, data.name, data.species, data.level, s.saved_at));
       } catch {
-        lines.push(`  • ${s.slot_name} — (corrupted)`);
+        lines.push(`  • ${s.slot_name} — ${M.slotCorrupted}`);
       }
     }
     lines.push("");
-    lines.push("bbddy_summon { slot: \"<name>\" } 으로 불러오세요.");
+    lines.push(M.slotListFooter);
     return { content: [{ type: "text", text: lines.join("\n") }] };
+  }
+
+  if (name === "bbddy_language") {
+    const M = serverMessages();
+    const { lang } = args as { lang?: string };
+    if (!lang) {
+      return { content: [{ type: "text", text: M.languageCurrent(getLang()) }] };
+    }
+    if (!SUPPORTED_LANGS.includes(lang as Lang)) {
+      return { content: [{ type: "text", text: M.languageInvalid }] };
+    }
+    setLang(lang as Lang);
+    // Re-read messages in the new language so the confirmation itself is localized.
+    return { content: [{ type: "text", text: serverMessages().languageSet(lang as Lang) }] };
   }
 
   throw new Error(`Tool not found: ${name}`);

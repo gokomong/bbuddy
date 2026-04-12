@@ -8,12 +8,37 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { createRequire } from 'module';
 
 const STATUS_PATH = join(homedir(), '.claude', 'bbddy-status.json');
 const REACTION_TTL_MS = 20_000;
 
-const SUCCESS_TEXTS = ['잘됐다!', '굿!', '완료!', '좋아~', '성공!', '오예!', '완벽해'];
-const FAIL_TEXTS = ['괜찮아...', '다시 해봐', '흠...', '에러다', '버그 잡자!', '같이 보자'];
+function getLang() {
+  try {
+    const _require = createRequire(import.meta.url);
+    const Database = _require(join(homedir(), '.bbddy', 'server', 'node_modules', 'better-sqlite3'));
+    const db = new Database(join(homedir(), '.bbddy', 'bbddy.db'), { readonly: true });
+    const row = db.prepare("SELECT value FROM settings WHERE key = 'language'").get();
+    db.close();
+    if (row?.value === 'ko' || row?.value === 'en') return row.value;
+  } catch { /* non-fatal */ }
+  return 'en';
+}
+
+const REACTION_POOLS = {
+  en: {
+    success: ['nice!', 'good!', 'done!', 'sweet~', 'works!', 'yes!', 'perfect'],
+    fail:    ['no worries', 'try again', 'hmm...', 'error time', 'lets squash it', 'got it together'],
+  },
+  ko: {
+    success: ['잘됐다!', '굿!', '완료!', '좋아~', '성공!', '오예!', '완벽해'],
+    fail:    ['괜찮아...', '다시 해봐', '흠...', '에러다', '버그 잡자!', '같이 보자'],
+  },
+};
+
+const POOLS = REACTION_POOLS[getLang()];
+const SUCCESS_TEXTS = POOLS.success;
+const FAIL_TEXTS = POOLS.fail;
 
 function pick(arr) {
   return arr[Math.floor(Math.random() * arr.length)];

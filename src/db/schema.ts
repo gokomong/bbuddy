@@ -89,6 +89,11 @@ export function initDb() {
       custom_sprite  TEXT,
       saved_at       TEXT DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `);
 
   // bbddy schema migrations — safe to run on existing DBs

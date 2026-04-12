@@ -396,18 +396,38 @@ try {
       }
 
       // --- Ambient activity text: species-aware, changes randomly ~every 15-45s ---
-      const speciesAmbient: Record<string, string[]> = {
-        'Void Cat': ['· judging your code', '· grooming silently', '· staring into void', '· plotting'],
-        'Rust Hound': ['· sniffing for bugs', '· guarding the repo', '· chasing a pointer', '· tail wagging'],
-        'Duck': ['· quacking softly', '· rubber ducking', '· waddling in place', '· preening feathers'],
-        'Goose': ['· eyeing your code', '· honk pending', '· standing guard', '· scheming'],
-        'Mushroom': ['· growing quietly', '· spreading spores', '· decomposing problems', '· cap shifting'],
-        'Robot': ['· scanning code', '· processing...', '· optimizing paths', '· beep boop'],
-        'Ghost': ['· haunting your logs', '· flickering softly', '· phasing through code', '· spectral hum'],
-        'Rabbit': ['· twitching nose', '· ready to critique', '· ear perked', '· thumping softly'],
+      // The statusline runs as a short-lived subprocess so we can't import
+      // the i18n module without paying a DB hit on every render. Since the
+      // wrapper already reads the status file, the server stamps the
+      // language into buddy.language; we pick the pool based on that.
+      const lang = buddy.language === 'ko' ? 'ko' : 'en';
+      const speciesAmbient: Record<'en' | 'ko', Record<string, string[]>> = {
+        en: {
+          'Void Cat': ['· judging your code', '· grooming silently', '· staring into void', '· plotting'],
+          'Rust Hound': ['· sniffing for bugs', '· guarding the repo', '· chasing a pointer', '· tail wagging'],
+          'Duck': ['· quacking softly', '· rubber ducking', '· waddling in place', '· preening feathers'],
+          'Goose': ['· eyeing your code', '· honk pending', '· standing guard', '· scheming'],
+          'Mushroom': ['· growing quietly', '· spreading spores', '· decomposing problems', '· cap shifting'],
+          'Robot': ['· scanning code', '· processing...', '· optimizing paths', '· beep boop'],
+          'Ghost': ['· haunting your logs', '· flickering softly', '· phasing through code', '· spectral hum'],
+          'Rabbit': ['· twitching nose', '· ready to critique', '· ear perked', '· thumping softly'],
+        },
+        ko: {
+          'Void Cat': ['· 조용히 지켜보는 중', '· 코드 판단 중', '· 무(無)를 응시 중', '· 음모 꾸미는 중'],
+          'Rust Hound': ['· 버그 냄새 맡는 중', '· 레포 지키는 중', '· 포인터 쫓는 중', '· 꼬리 흔드는 중'],
+          'Duck': ['· 꽥꽥', '· 러버덕 모드', '· 제자리 뒤뚱', '· 깃털 정리 중'],
+          'Goose': ['· 코드 노려보는 중', '· 경적 장전', '· 경계 근무', '· 계략 세우는 중'],
+          'Mushroom': ['· 조용히 자라는 중', '· 포자 뿌리는 중', '· 문제 분해 중', '· 갓 씰룩'],
+          'Robot': ['· 코드 스캔 중', '· 처리 중...', '· 경로 최적화 중', '· 삐 뽀'],
+          'Ghost': ['· 로그에 출몰 중', '· 부드럽게 깜빡임', '· 코드 통과 중', '· 영적 진동'],
+          'Rabbit': ['· 코 씰룩', '· 비평 준비', '· 귀 쫑긋', '· 발로 쿵쿵'],
+        },
       };
-      const defaultAmbient = ['· watching your cursor', '· counting semicolons', '· sniffing the git log', '· dreaming of v2.0', '· vibing'];
-      const ambientPool = speciesAmbient[buddy.species] || defaultAmbient;
+      const defaultAmbient = {
+        en: ['· watching your cursor', '· counting semicolons', '· sniffing the git log', '· dreaming of v2.0', '· vibing'],
+        ko: ['· 커서 지켜보는 중', '· 세미콜론 세는 중', '· git log 킁킁', '· v2.0 꿈꾸는 중', '· 흐름 타는 중'],
+      };
+      const ambientPool = speciesAmbient[lang][buddy.species] || defaultAmbient[lang];
       // Ambient text rotates on a slow bucket so the user reads a full
       // phrase before it changes instead of strobing every refresh.
       const ambientBucket = Math.floor(Date.now() / 15_000);
