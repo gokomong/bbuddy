@@ -232,12 +232,24 @@ function writeBuddyStatus(
 
     // Load custom sprite frames if available
     let customIdleFrames: string[][] | undefined;
-    if (companion.creationMode === 'created' && companionId) {
-      const spriteRow = db.prepare(
-        "SELECT idle_frames FROM custom_sprites WHERE companion_id = ?"
-      ).get(companionId) as any;
-      if (spriteRow?.idle_frames) {
-        try { customIdleFrames = JSON.parse(spriteRow.idle_frames); } catch { /* ignore */ }
+    if (companion.creationMode === 'created') {
+      // Resolve companionId if the caller didn't pass one. Looking up by name
+      // keeps custom_idle_frames present in the status file even from call
+      // sites that forgot the explicit id argument.
+      let cid = companionId;
+      if (!cid) {
+        const row = db.prepare(
+          "SELECT id FROM companions WHERE name = ? AND creation_mode = 'created'"
+        ).get(companion.name) as any;
+        cid = row?.id;
+      }
+      if (cid) {
+        const spriteRow = db.prepare(
+          "SELECT idle_frames FROM custom_sprites WHERE companion_id = ?"
+        ).get(cid) as any;
+        if (spriteRow?.idle_frames) {
+          try { customIdleFrames = JSON.parse(spriteRow.idle_frames); } catch { /* ignore */ }
+        }
       }
     }
 
@@ -477,7 +489,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     const reaction = getReaction(finalSpecies, 'hatch', 'happy');
 
-    writeBuddyStatus(companion);
+    writeBuddyStatus(companion, undefined, id);
 
     return {
       content: [
@@ -509,7 +521,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     const statusCard = renderCard(companion);
 
-    writeBuddyStatus(companion);
+    writeBuddyStatus(companion, undefined, row.id);
 
     return { content: [{ type: "text", text: statusCard }] };
   }
@@ -592,7 +604,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       expires: Date.now() + (xpResult.leveledUp ? 15_000 : 10_000),
       eyeOverride: xpResult.leveledUp ? SPARKLE_EYE : result.reaction.eyeOverride,
       indicator: xpResult.leveledUp ? '✨' : result.reaction.indicator,
-    });
+    }, row.id);
 
     // Render speech bubble with template fallback for immediate visual feedback
     const art = renderSprite(companion);
@@ -662,7 +674,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       expires: Date.now() + 10_000,
       eyeOverride: '◉',
       indicator: '♥',
-    });
+    }, row.id);
 
     const petDisplay = [
       ...hearts,
@@ -696,7 +708,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     db.prepare("UPDATE companions SET mood = 'happy' WHERE id = ?").run(row.id);
     const companion = loadCompanion({ ...row, mood: 'happy' })!;
-    writeBuddyStatus(companion);
+    writeBuddyStatus(companion, undefined, row.id);
 
     return { content: [{ type: "text", text: `${companion.name} is back! It'll chime in as you code.` }] };
   }
@@ -965,7 +977,7 @@ async function main() {
   const existing = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
   if (existing) {
     const companion = loadCompanion(existing);
-    if (companion) writeBuddyStatus(companion);
+    if (companion) writeBuddyStatus(companion, undefined, existing.id);
   }
 
   const transport = new StdioServerTransport();
