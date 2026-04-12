@@ -392,18 +392,25 @@ if (buddyRight.length === 0) {
   //      drop the HUD and right-align just the buddy. The buddy is the
   //      thing the user wants to see — losing the HUD is the lesser evil.
   //   3. If we don't know the width at all, hug the HUD with a fixed gutter.
-  const MARGIN = Number(process.env.BBDDY_RIGHT_MARGIN) || 3;
+  // Claude Code reserves ~10 columns inside the terminal for its own UI
+  // padding (the panel border, the prompt margin, the line-wrap indicator
+  // etc). The terminal emulator reports the full pane width but our actual
+  // usable statusline area is narrower. Subtract a fixed reservation so
+  // right-aligned lines never sit past Claude Code's render edge.
+  const CLAUDE_RESERVATION = Number(process.env.BBDDY_CLAUDE_RESERVATION) || 10;
+  const MARGIN = Number(process.env.BBDDY_RIGHT_MARGIN) || 1;
   let padWidth: number;
   let dropHud = false;
   if (termCols !== null) {
-    const fits = maxHudWidth + gutter + maxBuddyWidth + MARGIN <= termCols;
+    const usableCols = Math.max(0, termCols - CLAUDE_RESERVATION);
+    const fits = maxHudWidth + gutter + maxBuddyWidth + MARGIN <= usableCols;
     if (fits) {
-      const rightAlignedPad = termCols - maxBuddyWidth - MARGIN;
+      const rightAlignedPad = usableCols - maxBuddyWidth - MARGIN;
       padWidth = Math.max(maxHudWidth + gutter, rightAlignedPad);
     } else {
       // Buddy-only mode: right-align the buddy and skip the HUD entirely.
       dropHud = true;
-      padWidth = Math.max(0, termCols - maxBuddyWidth - MARGIN);
+      padWidth = Math.max(0, usableCols - maxBuddyWidth - MARGIN);
     }
   } else {
     padWidth = maxHudWidth + gutter;
