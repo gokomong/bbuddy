@@ -28,6 +28,22 @@ try {
   stdinData = readFileSync(0, "utf-8");
 } catch { /* no stdin */ }
 
+// Determine terminal width. Claude Code does not pass columns directly via
+// stdin JSON, so we try a small chain: parsed stdin fields → COLUMNS env
+// var → a wide default that matches typical terminals.
+function detectTermCols(): number {
+  try {
+    if (stdinData) {
+      const parsed = JSON.parse(stdinData);
+      const fromJson = parsed?.terminal?.columns ?? parsed?.terminal?.width ?? parsed?.cols ?? parsed?.columns;
+      if (typeof fromJson === 'number' && fromJson > 0) return fromJson;
+    }
+  } catch { /* not JSON */ }
+  const envCols = Number(process.env.COLUMNS);
+  if (envCols > 0) return envCols;
+  return 180;
+}
+
 // Run claude-hud with caching (HUD data changes slowly, no need to re-run every render)
 const HUD_CACHE_PATH = join(homedir(), ".claude", "hud-cache.json");
 const HUD_CACHE_TTL = 10_000; // 10 seconds
@@ -263,11 +279,14 @@ if (buddyRight.length === 0) {
   const buddyVisibleWidths = buddyRight.map((l) => stripAnsi(l).length);
   const maxBuddyWidth = Math.max(...buddyVisibleWidths, 0);
   const gutter = 3;
-  const padWidth = maxHudWidth + gutter;
-  // When running as subprocess, process.stdout.columns is undefined — always use side-by-side
-  const termCols = process.stdout.columns;
-  const sideBySideWidth = maxHudWidth + gutter + maxBuddyWidth;
-  const useSideBySide = !termCols || sideBySideWidth <= termCols;
+  const termCols = detectTermCols();
+  const minSideBySideWidth = maxHudWidth + gutter + maxBuddyWidth;
+  const useSideBySide = minSideBySideWidth <= termCols;
+  // Right-align: push the buddy so its right edge lands near the terminal edge
+  // (one char of right margin so it doesn't kiss the border). Clamp so we
+  // never back up underneath the HUD.
+  const rightAlignedPad = termCols - maxBuddyWidth - 1;
+  const padWidth = Math.max(maxHudWidth + gutter, rightAlignedPad);
 
   if (useSideBySide) {
     // Side-by-side layout
