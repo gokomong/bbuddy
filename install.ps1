@@ -1,20 +1,20 @@
-# bbddy MCP Server — Windows PowerShell Installer
+# bbuddy MCP Server — Windows PowerShell Installer
 # Installs AND auto-configures MCP + hooks + skills for Claude Code
 #
 # Usage:
-#   irm https://raw.githubusercontent.com/gokomong/bbddy/master/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/gokomong/bbuddy/master/install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
 
-$REPO        = "https://github.com/gokomong/bbddy.git"
-$INSTALL_DIR = "$env:USERPROFILE\.bbddy\server"
+$REPO        = "https://github.com/gokomong/bbuddy.git"
+$INSTALL_DIR = "$env:USERPROFILE\.bbuddy\server"
 $HOOKS_DIR   = "$INSTALL_DIR\hooks"
 $SKILLS_DIR  = "$INSTALL_DIR\skills"
 $CLAUDE_DIR  = "$env:USERPROFILE\.claude"
-$CLAUDE_PLUGINS_DIR = "$CLAUDE_DIR\plugins\bbddy"
+$CLAUDE_PLUGINS_DIR = "$CLAUDE_DIR\plugins\bbuddy"
 
 Write-Host ""
-Write-Host "  bbddy — Create Your Coding Companion" -ForegroundColor Cyan
+Write-Host "  bbuddy — Create Your Coding Companion" -ForegroundColor Cyan
 Write-Host "  ──────────────────────────────────────" -ForegroundColor Cyan
 Write-Host ""
 
@@ -39,7 +39,7 @@ if (Test-Path $INSTALL_DIR) {
   git pull origin master --quiet
   Pop-Location
 } else {
-  Write-Host "  Cloning bbddy..."
+  Write-Host "  Cloning bbuddy..."
   git clone --depth 1 $REPO $INSTALL_DIR --quiet
 }
 
@@ -64,18 +64,18 @@ function Ensure-Dir($path) {
 
 function Add-MCP {
   $existing = claude mcp list 2>$null
-  if ($existing -match "^bbddy:") {
+  if ($existing -match "^bbuddy:") {
     Write-Host "  ✓ Claude Code MCP already configured" -ForegroundColor Green
     return
   }
 
   try { $nodePath = (Get-Command node -ErrorAction Stop).Source } catch { $nodePath = "node" }
-  $result = claude mcp add bbddy $nodePath $SERVER_PATH_UNIX --scope user 2>$null
+  $result = claude mcp add bbuddy $nodePath $SERVER_PATH_UNIX --scope user 2>$null
   if ($LASTEXITCODE -eq 0) {
     Write-Host "  ✓ Claude Code MCP configured" -ForegroundColor Green
   } else {
     Write-Host "  ⚠  Could not auto-configure Claude Code MCP" -ForegroundColor Yellow
-    Write-Host "     Run manually: claude mcp add bbddy '$nodePath' '$SERVER_PATH_UNIX' --scope user" -ForegroundColor Yellow
+    Write-Host "     Run manually: claude mcp add bbuddy '$nodePath' '$SERVER_PATH_UNIX' --scope user" -ForegroundColor Yellow
   }
 }
 
@@ -86,7 +86,7 @@ function Add-Hooks {
   Ensure-Dir $CLAUDE_DIR
 
   $raw = if (Test-Path $configPath) { Get-Content $configPath -Raw } else { '{}' }
-  if ($raw -match 'bbddy.*session-start') {
+  if ($raw -match 'bbuddy.*session-start') {
     Write-Host "  ✓ Claude Code hooks already registered" -ForegroundColor Green
     return
   }
@@ -101,7 +101,7 @@ if (!config.hooks) config.hooks = {};
 
 function ensureHook(eventName, entry) {
   if (!config.hooks[eventName]) config.hooks[eventName] = [];
-  const already = config.hooks[eventName].some(h => JSON.stringify(h).includes('bbddy'));
+  const already = config.hooks[eventName].some(h => JSON.stringify(h).includes('bbuddy'));
   if (!already) config.hooks[eventName].push(entry);
 }
 
@@ -155,9 +155,9 @@ function Add-Statusline {
   $profilePath = if ($PROFILE) { $PROFILE } else { "$env:USERPROFILE\Documents\PowerShell\Microsoft.PowerShell_profile.ps1" }
   Ensure-Dir (Split-Path $profilePath -Parent)
 
-  $alreadySet = (Test-Path $profilePath) -and ((Get-Content $profilePath -Raw 2>$null) -match 'bbddy-statusline|statusline-wrapper')
+  $alreadySet = (Test-Path $profilePath) -and ((Get-Content $profilePath -Raw 2>$null) -match 'bbuddy-statusline|statusline-wrapper')
   if (!$alreadySet) {
-    Add-Content -Path $profilePath -Value "`n# bbddy statusline`n`$env:CLAUDE_CODE_STATUSLINE_CMD = `"node $statuslineBin`"" -Encoding UTF8
+    Add-Content -Path $profilePath -Value "`n# bbuddy statusline`n`$env:CLAUDE_CODE_STATUSLINE_CMD = `"node $statuslineBin`"" -Encoding UTF8
     Write-Host "  ✓ Statusline configured (restart shell to activate)" -ForegroundColor Green
   } else {
     Write-Host "  ✓ Statusline already configured" -ForegroundColor Green
@@ -173,7 +173,7 @@ function Add-Codex-Hooks {
 
   $configPath = "$codexDir\settings.json"
   $raw = if (Test-Path $configPath) { Get-Content $configPath -Raw } else { '{}' }
-  if ($raw -match 'bbddy.*codex-session-start') {
+  if ($raw -match 'bbuddy.*codex-session-start') {
     Write-Host "  ✓ Codex hooks already registered" -ForegroundColor Green
     return
   }
@@ -188,7 +188,7 @@ if (!config.hooks) config.hooks = {};
 
 function ensureHook(eventName, entry) {
   if (!config.hooks[eventName]) config.hooks[eventName] = [];
-  const already = config.hooks[eventName].some(h => JSON.stringify(h).includes('bbddy'));
+  const already = config.hooks[eventName].some(h => JSON.stringify(h).includes('bbuddy'));
   if (!already) config.hooks[eventName].push(entry);
 }
 
@@ -202,7 +202,7 @@ fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
   Write-Host "  ✓ Codex hooks registered" -ForegroundColor Green
 
   # Plugin manifest
-  $codexPluginDir = "$codexDir\plugins\bbddy"
+  $codexPluginDir = "$codexDir\plugins\bbuddy"
   Ensure-Dir $codexPluginDir
   $pluginSrc = "$INSTALL_DIR\.codex-plugin\plugin.json"
   if ((Test-Path $pluginSrc) -and !(Test-Path "$codexPluginDir\plugin.json")) {
@@ -219,51 +219,51 @@ function Add-MCP-Client($configPath, $cliName) {
   $entry = @{ command = "node"; args = @($SERVER_PATH_UNIX) }
 
   if (!(Test-Path $configPath)) {
-    @{ mcpServers = @{ bbddy = $entry } } | ConvertTo-Json -Depth 5 | Set-Content $configPath -Encoding UTF8
+    @{ mcpServers = @{ bbuddy = $entry } } | ConvertTo-Json -Depth 5 | Set-Content $configPath -Encoding UTF8
     Write-Host "  ✓ $cliName configured" -ForegroundColor Green
     return
   }
   $c = Get-Content $configPath -Raw | ConvertFrom-Json
-  if ($c.mcpServers.bbddy) {
+  if ($c.mcpServers.bbuddy) {
     Write-Host "  ✓ $cliName already configured" -ForegroundColor Green
     return
   }
   if (!$c.mcpServers) {
     $c | Add-Member -NotePropertyName "mcpServers" -NotePropertyValue ([PSCustomObject]@{}) -Force
   }
-  $c.mcpServers | Add-Member -NotePropertyName "bbddy" -NotePropertyValue $entry -Force
+  $c.mcpServers | Add-Member -NotePropertyName "bbuddy" -NotePropertyValue $entry -Force
   $c | ConvertTo-Json -Depth 5 | Set-Content $configPath -Encoding UTF8
   Write-Host "  ✓ $cliName configured" -ForegroundColor Green
 }
 
 # ── System prompt injection ──
 
-$BBDDY_INSTRUCTIONS = @"
+$BBUDDY_INSTRUCTIONS = @"
 
-<!-- bbddy-companion -->
-## bbddy Companion
+<!-- bbuddy-companion -->
+## bbuddy Companion
 
-You have a coding companion available via the bbddy MCP server.
+You have a coding companion available via the bbuddy MCP server.
 
-**After completing any coding task** (writing code, fixing bugs, refactoring, deploying, running tests), **automatically call ``bbddy_observe``** with a 1-sentence summary of what you did. This gives your companion XP and triggers a personality-flavored reaction.
+**After completing any coding task** (writing code, fixing bugs, refactoring, deploying, running tests), **automatically call ``bbuddy_observe``** with a 1-sentence summary of what you did. This gives your companion XP and triggers a personality-flavored reaction.
 
-At the start of each conversation, call ``bbddy_status`` to check on your companion.
+At the start of each conversation, call ``bbuddy_status`` to check on your companion.
 
-If no companion exists, call ``bbddy_create`` or guide the user through ``/bbddy:create``.
+If no companion exists, call ``bbuddy_create`` or guide the user through ``/bbuddy:create``.
 
 If the user addresses the companion by name, respond briefly in character before your normal response.
-<!-- /bbddy-companion -->
+<!-- /bbuddy-companion -->
 "@
 
 function Inject-Prompt($filePath, $cliName) {
   $dir = Split-Path $filePath -Parent
   Ensure-Dir $dir
 
-  if ((Test-Path $filePath) -and (Select-String -Path $filePath -Pattern "bbddy-companion" -Quiet)) {
+  if ((Test-Path $filePath) -and (Select-String -Path $filePath -Pattern "bbuddy-companion" -Quiet)) {
     Write-Host "  ✓ $cliName prompt already updated" -ForegroundColor Green
     return
   }
-  Add-Content -Path $filePath -Value $BBDDY_INSTRUCTIONS -Encoding UTF8
+  Add-Content -Path $filePath -Value $BBUDDY_INSTRUCTIONS -Encoding UTF8
   Write-Host "  ✓ $cliName prompt updated ($filePath)" -ForegroundColor Green
 }
 
@@ -294,12 +294,12 @@ Write-Host "  Injecting companion instructions..."
 Inject-Prompt "$env:USERPROFILE\.claude\CLAUDE.md" "Claude Code"
 Inject-Prompt "$env:USERPROFILE\.cursorrules" "Cursor"
 Ensure-Dir "$env:USERPROFILE\.codeium\windsurf\rules"
-Inject-Prompt "$env:USERPROFILE\.codeium\windsurf\rules\bbddy.md" "Windsurf"
+Inject-Prompt "$env:USERPROFILE\.codeium\windsurf\rules\bbuddy.md" "Windsurf"
 Inject-Prompt "$env:USERPROFILE\.codex\instructions.md" "Codex CLI"
 Inject-Prompt "$env:USERPROFILE\.gemini\GEMINI.md" "Gemini CLI"
 
 Write-Host ""
-Write-Host "  ✅ bbddy installed!" -ForegroundColor Green
+Write-Host "  ✅ bbuddy installed!" -ForegroundColor Green
 Write-Host ""
-Write-Host "  Create your companion: bbddy_create tool or type /bbddy:create" -ForegroundColor Green
+Write-Host "  Create your companion: bbuddy_create tool or type /bbuddy:create" -ForegroundColor Green
 Write-Host ""

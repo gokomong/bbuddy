@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * bbddy PreToolUse hook
+ * bbuddy PreToolUse hook
  * Sets a brief "working" state when a Bash command is about to run.
  * This makes the companion look busy in the statusline during execution.
  */
@@ -8,7 +8,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 
-const STATUS_PATH = join(homedir(), '.claude', 'bbddy-status.json');
+const STATUS_PATH = join(homedir(), '.claude', 'bbuddy-status.json');
 const WORKING_TTL_MS = 15_000; // clears if post-tool-use doesn't fire
 
 // Read hook input

@@ -3,9 +3,9 @@ import path from 'path';
 import { mkdirSync, existsSync, copyFileSync } from 'fs';
 import { homedir } from 'os';
 
-const bbddyDir = path.join(homedir(), '.bbddy');
-mkdirSync(bbddyDir, { recursive: true });
-const dbPath = path.join(bbddyDir, 'bbddy.db');
+const bbuddyDir = path.join(homedir(), '.bbuddy');
+mkdirSync(bbuddyDir, { recursive: true });
+const dbPath = path.join(bbuddyDir, 'bbuddy.db');
 
 // Migrate from old ~/.buddy/buddy.db if it exists and new DB doesn't
 const oldDbPath = path.join(homedir(), '.buddy', 'buddy.db');
@@ -96,7 +96,7 @@ export function initDb() {
     );
   `);
 
-  // bbddy schema migrations — safe to run on existing DBs
+  // bbuddy schema migrations — safe to run on existing DBs
   const cols = db.pragma('table_info(companions)') as any[];
   const colNames = new Set(cols.map((c: any) => c.name));
   if (!colNames.has('creation_mode')) {

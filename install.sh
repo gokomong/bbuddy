@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# bbddy MCP Server — Cross-platform installer
+# bbuddy MCP Server — Cross-platform installer
 # Installs AND auto-configures MCP + hooks + skills for Claude Code
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/gokomong/bbddy/master/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/gokomong/bbuddy/master/install.sh | bash
 
 set -e
 
-REPO="https://github.com/gokomong/bbddy.git"
-INSTALL_DIR="$HOME/.bbddy/server"
+REPO="https://github.com/gokomong/bbuddy.git"
+INSTALL_DIR="$HOME/.bbuddy/server"
 HOOKS_DIR="$INSTALL_DIR/hooks"
 SKILLS_DIR="$INSTALL_DIR/skills"
 CLAUDE_DIR="$HOME/.claude"
-CLAUDE_PLUGINS_DIR="$CLAUDE_DIR/plugins/bbddy"
+CLAUDE_PLUGINS_DIR="$CLAUDE_DIR/plugins/bbuddy"
 
 BLUE='\033[0;34m'
 GREEN='\033[0;32m'
@@ -21,7 +21,7 @@ DIM='\033[2m'
 NC='\033[0m'
 
 echo -e "${BLUE}"
-echo '  bbddy — Create Your Coding Companion'
+echo '  bbuddy — Create Your Coding Companion'
 echo '  ──────────────────────────────────────'
 echo -e "${NC}"
 
@@ -50,7 +50,7 @@ if [ -d "$INSTALL_DIR" ]; then
   cd "$INSTALL_DIR"
   git pull origin master --quiet
 else
-  echo "  Cloning bbddy..."
+  echo "  Cloning bbuddy..."
   git clone --depth 1 "$REPO" "$INSTALL_DIR" --quiet
 fi
 
@@ -66,18 +66,18 @@ SERVER_PATH="$INSTALL_DIR/dist/server/index.js"
 # ── Claude Code: MCP server ──
 
 configure_claude_code_mcp() {
-  if claude mcp list 2>/dev/null | grep -q "^bbddy:"; then
+  if claude mcp list 2>/dev/null | grep -q "^bbuddy:"; then
     echo -e "  ${GREEN}✓${NC} Claude Code MCP already configured"
     return 0
   fi
 
   local node_path
   node_path="$(command -v node)"
-  if claude mcp add bbddy "$node_path" "$SERVER_PATH" --scope user 2>/dev/null; then
+  if claude mcp add bbuddy "$node_path" "$SERVER_PATH" --scope user 2>/dev/null; then
     echo -e "  ${GREEN}✓${NC} Claude Code MCP configured"
   else
     echo -e "  ${YELLOW}⚠${NC}  Could not auto-configure Claude Code MCP"
-    echo -e "     Run manually: claude mcp add bbddy '$node_path' '$SERVER_PATH' --scope user"
+    echo -e "     Run manually: claude mcp add bbuddy '$node_path' '$SERVER_PATH' --scope user"
   fi
 }
 
@@ -87,7 +87,7 @@ configure_hooks() {
   local config_file="$CLAUDE_DIR/settings.json"
   mkdir -p "$CLAUDE_DIR"
 
-  if grep -q 'bbddy.*session-start' "$config_file" 2>/dev/null; then
+  if grep -q 'bbuddy.*session-start' "$config_file" 2>/dev/null; then
     echo -e "  ${GREEN}✓${NC} Claude Code hooks already registered"
     return 0
   fi
@@ -104,7 +104,7 @@ configure_hooks() {
 
     function ensureHook(eventName, entry) {
       if (!config.hooks[eventName]) config.hooks[eventName] = [];
-      const already = config.hooks[eventName].some(h => JSON.stringify(h).includes('bbddy'));
+      const already = config.hooks[eventName].some(h => JSON.stringify(h).includes('bbuddy'));
       if (!already) config.hooks[eventName].push(entry);
     }
 
@@ -158,9 +158,9 @@ configure_statusline() {
   local added=false
 
   for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
-    if [ -f "$rc" ] && ! grep -q 'bbddy-statusline\|statusline-wrapper' "$rc" 2>/dev/null; then
+    if [ -f "$rc" ] && ! grep -q 'bbuddy-statusline\|statusline-wrapper' "$rc" 2>/dev/null; then
       echo "" >> "$rc"
-      echo "# bbddy statusline" >> "$rc"
+      echo "# bbuddy statusline" >> "$rc"
       echo "export CLAUDE_CODE_STATUSLINE_CMD=\"node $statusline_bin\"" >> "$rc"
       added=true
     fi
@@ -183,19 +183,19 @@ configure_cursor() {
     cat > "$config_file" << EOJSON
 {
   "mcpServers": {
-    "bbddy": {
+    "bbuddy": {
       "command": "node",
       "args": ["$SERVER_PATH"]
     }
   }
 }
 EOJSON
-  elif ! grep -q '"bbddy"' "$config_file" 2>/dev/null; then
+  elif ! grep -q '"bbuddy"' "$config_file" 2>/dev/null; then
     node -e "
       const fs = require('fs');
       const config = JSON.parse(fs.readFileSync('$config_file', 'utf-8'));
       if (!config.mcpServers) config.mcpServers = {};
-      config.mcpServers.bbddy = { command: 'node', args: ['$SERVER_PATH'] };
+      config.mcpServers.bbuddy = { command: 'node', args: ['$SERVER_PATH'] };
       fs.writeFileSync('$config_file', JSON.stringify(config, null, 2));
     " 2>/dev/null
   fi
@@ -209,7 +209,7 @@ configure_codex() {
   if [ ! -d "$codex_dir" ]; then return; fi
   mkdir -p "$codex_dir"
 
-  if grep -q 'bbddy.*codex-session-start' "$config_file" 2>/dev/null; then
+  if grep -q 'bbuddy.*codex-session-start' "$config_file" 2>/dev/null; then
     echo -e "  ${GREEN}✓${NC} Codex hooks already registered"
     return 0
   fi
@@ -227,7 +227,7 @@ configure_codex() {
 
     function ensureHook(eventName, entry) {
       if (!config.hooks[eventName]) config.hooks[eventName] = [];
-      const already = config.hooks[eventName].some(h => JSON.stringify(h).includes('bbddy'));
+      const already = config.hooks[eventName].some(h => JSON.stringify(h).includes('bbuddy'));
       if (!already) config.hooks[eventName].push(entry);
     }
 
@@ -251,7 +251,7 @@ configure_codex() {
   echo -e "  ${GREEN}✓${NC} Codex hooks registered"
 
   # Install plugin manifest
-  local codex_plugins_dir="$HOME/.codex/plugins/bbddy"
+  local codex_plugins_dir="$HOME/.codex/plugins/bbuddy"
   mkdir -p "$codex_plugins_dir"
   [ -f "$INSTALL_DIR/.codex-plugin/plugin.json" ] && \
     cp "$INSTALL_DIR/.codex-plugin/plugin.json" "$codex_plugins_dir/plugin.json" && \
@@ -267,19 +267,19 @@ configure_windsurf() {
     cat > "$config_file" << EOJSON
 {
   "mcpServers": {
-    "bbddy": {
+    "bbuddy": {
       "command": "node",
       "args": ["$SERVER_PATH"]
     }
   }
 }
 EOJSON
-  elif ! grep -q '"bbddy"' "$config_file" 2>/dev/null; then
+  elif ! grep -q '"bbuddy"' "$config_file" 2>/dev/null; then
     node -e "
       const fs = require('fs');
       const config = JSON.parse(fs.readFileSync('$config_file', 'utf-8'));
       if (!config.mcpServers) config.mcpServers = {};
-      config.mcpServers.bbddy = { command: 'node', args: ['$SERVER_PATH'] };
+      config.mcpServers.bbuddy = { command: 'node', args: ['$SERVER_PATH'] };
       fs.writeFileSync('$config_file', JSON.stringify(config, null, 2));
     " 2>/dev/null
   fi
@@ -288,19 +288,19 @@ EOJSON
 
 # ── System prompt injection ──
 
-BBDDY_INSTRUCTIONS='<!-- bbddy-companion -->
-## bbddy Companion
+BBUDDY_INSTRUCTIONS='<!-- bbuddy-companion -->
+## bbuddy Companion
 
-You have a coding companion available via the bbddy MCP server.
+You have a coding companion available via the bbuddy MCP server.
 
-**After completing any coding task** (writing code, fixing bugs, refactoring, deploying, running tests), **automatically call `bbddy_observe`** with a 1-sentence summary of what you did. This gives your companion XP and triggers a personality-flavored reaction.
+**After completing any coding task** (writing code, fixing bugs, refactoring, deploying, running tests), **automatically call `bbuddy_observe`** with a 1-sentence summary of what you did. This gives your companion XP and triggers a personality-flavored reaction.
 
-At the start of each conversation, call `bbddy_status` to check on your companion.
+At the start of each conversation, call `bbuddy_status` to check on your companion.
 
-If no companion exists, call `bbddy_create` or guide the user through `/bbddy:create`.
+If no companion exists, call `bbuddy_create` or guide the user through `/bbuddy:create`.
 
 If the user addresses the companion by name, respond briefly in character before your normal response.
-<!-- /bbddy-companion -->'
+<!-- /bbuddy-companion -->'
 
 inject_prompt() {
   local file="$1"
@@ -309,12 +309,12 @@ inject_prompt() {
   dir="$(dirname "$file")"
   mkdir -p "$dir"
 
-  if [ -f "$file" ] && grep -q "bbddy-companion" "$file" 2>/dev/null; then
+  if [ -f "$file" ] && grep -q "bbuddy-companion" "$file" 2>/dev/null; then
     echo -e "  ${GREEN}✓${NC} $cli_name prompt already updated"
     return 0
   fi
   echo "" >> "$file"
-  echo "$BBDDY_INSTRUCTIONS" >> "$file"
+  echo "$BBUDDY_INSTRUCTIONS" >> "$file"
   echo -e "  ${GREEN}✓${NC} $cli_name prompt updated ${DIM}($file)${NC}"
 }
 
@@ -344,12 +344,12 @@ echo "  Injecting companion instructions..."
 inject_prompt "$HOME/.claude/CLAUDE.md" "Claude Code"
 inject_prompt "$HOME/.cursorrules" "Cursor"
 mkdir -p "$HOME/.codeium/windsurf/rules" 2>/dev/null
-inject_prompt "$HOME/.codeium/windsurf/rules/bbddy.md" "Windsurf"
+inject_prompt "$HOME/.codeium/windsurf/rules/bbuddy.md" "Windsurf"
 inject_prompt "$HOME/.codex/instructions.md" "Codex CLI"
 inject_prompt "$HOME/.gemini/GEMINI.md" "Gemini CLI"
 
 echo ""
-echo -e "${GREEN}  ✅ bbddy installed!${NC}"
+echo -e "${GREEN}  ✅ bbuddy installed!${NC}"
 echo ""
-echo -e "  Create your companion: ${GREEN}bbddy_create${NC} tool or type ${GREEN}/bbddy:create${NC}"
+echo -e "  Create your companion: ${GREEN}bbuddy_create${NC} tool or type ${GREEN}/bbuddy:create${NC}"
 echo ""

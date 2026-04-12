@@ -1,5 +1,5 @@
 // src/creator/manual-input.ts
-// Line-by-line manual sprite input for bbddy_create mode 4
+// Line-by-line manual sprite input for bbuddy_create mode 4
 
 import { type CustomSprite } from './parts-combiner.js';
 

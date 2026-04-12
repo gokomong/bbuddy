@@ -1,5 +1,5 @@
 // src/creator/wizard.ts
-// Wizard state evaluation and prompt rendering for bbddy_create
+// Wizard state evaluation and prompt rendering for bbuddy_create
 
 import { SPECIES_LIST } from '../lib/species.js';
 import { PERSONALITY_PRESETS, STAT_NAMES } from '../lib/types.js';
@@ -8,10 +8,10 @@ import { validateStatDistribution, STAT_POOL, STAT_MIN, STAT_MAX } from './stats
 import { getLang } from '../i18n/index.js';
 
 // Wizard string catalog. English is the default; Korean is selected when
-// the user runs `bbddy_language ko`.
+// the user runs `bbuddy_language ko`.
 const WIZARD_STRINGS = {
   en: {
-    title: '/bbddy:create wizard',
+    title: '/bbuddy:create wizard',
     stepName: '[1/4] Choose a name',
     namePrompt: 'Give your buddy a name.',
     nameExample: 'e.g., Mochi, Zyx, Pixel, Grumpf',
@@ -54,7 +54,7 @@ const WIZARD_STRINGS = {
     previewConfirm: 'Happy with this buddy? Call the tool again with confirm: true to finalize. Change params and re-call to go back.',
   },
   ko: {
-    title: '/bbddy:create wizard',
+    title: '/bbuddy:create wizard',
     stepName: '[1/4] 이름 짓기',
     namePrompt: '버디의 이름을 지어주세요.',
     nameExample: '예: Mochi, Zyx, Pixel, Grumpf',

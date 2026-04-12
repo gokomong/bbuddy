@@ -30,7 +30,7 @@ import { writeFileSync, mkdirSync, unlinkSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 
-const BUDDY_STATUS_PATH = join(homedir(), ".claude", "bbddy-status.json");
+const BUDDY_STATUS_PATH = join(homedir(), ".claude", "bbuddy-status.json");
 let statusDirEnsured = false;
 const RESET = '\x1b[0m';
 
@@ -200,7 +200,7 @@ function hatchAnimation(companion: Companion, customFrames?: string[]): string {
     '',
     `${companion.name} is here · it'll chime in as you code`,
     `uses the same AI subscription you're on`,
-    `say its name to get its take · /bbddy:pet · /bbddy:off`,
+    `say its name to get its take · /bbuddy:pet · /bbuddy:off`,
   ].join('\n');
 
   return [
@@ -224,7 +224,7 @@ function hatchAnimation(companion: Companion, customFrames?: string[]): string {
 // call the tool back with manual_frame1/2/3. Avoids needing a separate API key
 // since the host is already a capable model with its own billing.
 function buildAiDelegationPrompt(
-  tool: 'bbddy_create' | 'bbddy_evolve',
+  tool: 'bbuddy_create' | 'bbuddy_evolve',
   description: string,
   otherArgs: Record<string, unknown>,
 ): string {
@@ -323,7 +323,7 @@ function writeBuddyStatus(
 
 const server = new Server(
   {
-    name: "bbddy",
+    name: "bbuddy",
     version: "0.1.0",
   },
   {
@@ -344,8 +344,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
       {
-        name: "bbddy_create",
-        description: "Create a custom bbddy companion through a wizard (name → appearance → personality → stats). Choose appearance_mode: '1'=pick species, '2'=combine parts, '3'=AI generation, '4'=manual typing. Provide partial params to get guided prompts. Set confirm: true to finalize.",
+        name: "bbuddy_create",
+        description: "Create a custom bbuddy companion through a wizard (name → appearance → personality → stats). Choose appearance_mode: '1'=pick species, '2'=combine parts, '3'=AI generation, '4'=manual typing. Provide partial params to get guided prompts. Set confirm: true to finalize.",
         inputSchema: {
           type: "object",
           properties: {
@@ -376,8 +376,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: "bbddy_hatch",
-        description: "Hatch a new bbddy companion using deterministic RNG (random species + stats based on user_id). Use bbddy_create instead if you want to design your own companion.",
+        name: "bbuddy_hatch",
+        description: "Hatch a new bbuddy companion using deterministic RNG (random species + stats based on user_id). Use bbuddy_create instead if you want to design your own companion.",
         inputSchema: {
           type: "object",
           properties: {
@@ -392,8 +392,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: "bbddy_status",
-        description: "Get the current status of your bbddy companion. Call this at the start of a conversation to check on your buddy and learn its personality.",
+        name: "bbuddy_status",
+        description: "Get the current status of your bbuddy companion. Call this at the start of a conversation to check on your buddy and learn its personality.",
         inputSchema: {
           type: "object",
           properties: {
@@ -402,8 +402,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: "bbddy_remember",
-        description: "Manually add a memory for your bbddy to observe.",
+        name: "bbuddy_remember",
+        description: "Manually add a memory for your bbuddy to observe.",
         inputSchema: {
           type: "object",
           properties: {
@@ -414,7 +414,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: "bbddy_dream",
+        name: "bbuddy_dream",
         description: "Trigger memory consolidation (Dreaming).",
         inputSchema: {
           type: "object",
@@ -425,16 +425,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: "bbddy_respawn",
-        description: "Release your current bbddy companion and clear all data. Use bbddy_hatch or bbddy_create afterwards to get a new one.",
+        name: "bbuddy_respawn",
+        description: "Release your current bbuddy companion and clear all data. Use bbuddy_hatch or bbuddy_create afterwards to get a new one.",
         inputSchema: {
           type: "object",
           properties: {},
         },
       },
       {
-        name: "bbddy_observe",
-        description: "IMPORTANT: Call this tool automatically after completing any coding task (writing code, fixing a bug, refactoring, running tests, deploying). Pass a 1-sentence summary of what was done. Returns your bbddy's in-character reaction with a speech bubble and XP rewards. The user expects this to happen after every task — do not skip it.",
+        name: "bbuddy_observe",
+        description: "IMPORTANT: Call this tool automatically after completing any coding task (writing code, fixing a bug, refactoring, running tests, deploying). Pass a 1-sentence summary of what was done. Returns your bbuddy's in-character reaction with a speech bubble and XP rewards. The user expects this to happen after every task — do not skip it.",
         inputSchema: {
           type: "object",
           properties: {
@@ -456,23 +456,23 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: "bbddy_pet",
-        description: "Pet your bbddy! Shows a heart animation and a happy reaction.",
+        name: "bbuddy_pet",
+        description: "Pet your bbuddy! Shows a heart animation and a happy reaction.",
         inputSchema: { type: "object", properties: {} },
       },
       {
-        name: "bbddy_mute",
-        description: "Mute your bbddy. It won't chime in until unmuted.",
+        name: "bbuddy_mute",
+        description: "Mute your bbuddy. It won't chime in until unmuted.",
         inputSchema: { type: "object", properties: {} },
       },
       {
-        name: "bbddy_unmute",
-        description: "Unmute your bbddy so it can chime in again.",
+        name: "bbuddy_unmute",
+        description: "Unmute your bbuddy so it can chime in again.",
         inputSchema: { type: "object", properties: {} },
       },
       {
-        name: "bbddy_evolve",
-        description: "Change the appearance of your existing bbddy companion. Supports the same 4 modes as bbddy_create: 1=pick species, 2=parts, 3=AI generation, 4=manual. Set confirm: true to apply.",
+        name: "bbuddy_evolve",
+        description: "Change the appearance of your existing bbuddy companion. Supports the same 4 modes as bbuddy_create: 1=pick species, 2=parts, 3=AI generation, 4=manual. Set confirm: true to apply.",
         inputSchema: {
           type: "object",
           properties: {
@@ -490,8 +490,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: "bbddy_save",
-        description: "Save the current bbddy companion to a named slot so you can summon it back later. Slot name must be 1–24 chars.",
+        name: "bbuddy_save",
+        description: "Save the current bbuddy companion to a named slot so you can summon it back later. Slot name must be 1–24 chars.",
         inputSchema: {
           type: "object",
           properties: {
@@ -501,13 +501,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: "bbddy_list",
-        description: "List all saved bbddy slots with names, species, levels, and a small art preview.",
+        name: "bbuddy_list",
+        description: "List all saved bbuddy slots with names, species, levels, and a small art preview.",
         inputSchema: { type: "object", properties: {} },
       },
       {
-        name: "bbddy_summon",
-        description: "Replace the current bbddy companion with the one saved in the named slot. The current companion is auto-backed up to a special '__previous' slot first so you can swap back.",
+        name: "bbuddy_summon",
+        description: "Replace the current bbuddy companion with the one saved in the named slot. The current companion is auto-backed up to a special '__previous' slot first so you can swap back.",
         inputSchema: {
           type: "object",
           properties: {
@@ -517,8 +517,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: "bbddy_dismiss",
-        description: "Permanently delete a saved bbddy slot. The currently active companion is unaffected.",
+        name: "bbuddy_dismiss",
+        description: "Permanently delete a saved bbuddy slot. The currently active companion is unaffected.",
         inputSchema: {
           type: "object",
           properties: {
@@ -528,8 +528,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: "bbddy_language",
-        description: "Set or show the bbddy UI language. English ('en') is the default; pass 'ko' for Korean. Omit lang to see the current setting.",
+        name: "bbuddy_language",
+        description: "Set or show the bbuddy UI language. English ('en') is the default; pass 'ko' for Korean. Omit lang to see the current setting.",
         inputSchema: {
           type: "object",
           properties: {
@@ -545,7 +545,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
-  if (name === "bbddy_hatch") {
+  if (name === "bbuddy_hatch") {
     const { name: requestedName, species: requestedSpecies, user_id } = args as {
       name?: string; species?: string; user_id?: string;
     };
@@ -590,11 +590,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
   }
 
-  if (name === "bbddy_status") {
+  if (name === "bbuddy_status") {
     const { user_id } = args as { user_id?: string };
     const row = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
     if (!row) {
-      return { content: [{ type: "text", text: "No companion hatched yet! Use bbddy_hatch or bbddy_create to start." }] };
+      return { content: [{ type: "text", text: "No companion hatched yet! Use bbuddy_hatch or bbuddy_create to start." }] };
     }
 
     const userId = user_id || row.user_id || 'anon';
@@ -617,7 +617,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     return { content: [{ type: "text", text: statusCard }] };
   }
 
-  if (name === "bbddy_remember") {
+  if (name === "bbuddy_remember") {
     const { content, importance = 1 } = args as { content: string, importance?: number };
     const companion = db.prepare("SELECT id FROM companions LIMIT 1").get() as any;
     if (!companion) return { content: [{ type: "text", text: "Hatch a companion first!" }] };
@@ -631,7 +631,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
   }
 
-  if (name === "bbddy_dream") {
+  if (name === "bbuddy_dream") {
     const { depth } = args as { depth: 'light' | 'deep' };
     // Placeholder for actual consolidation logic
     return {
@@ -639,11 +639,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
   }
 
-  if (name === "bbddy_respawn") {
+  if (name === "bbuddy_respawn") {
     const companion = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
     if (!companion) {
       return {
-        content: [{ type: "text", text: "No companion to release. Use bbddy_hatch or bbddy_create to get started!" }],
+        content: [{ type: "text", text: "No companion to release. Use bbuddy_hatch or bbuddy_create to get started!" }],
       };
     }
 
@@ -664,19 +664,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     return {
       content: [
         { type: "text", text: `${oldName} the ${oldSpecies} has been released. Goodbye, friend!` },
-        { type: "text", text: "Use bbddy_hatch to hatch a new companion, or bbddy_create to design your own." },
+        { type: "text", text: "Use bbuddy_hatch to hatch a new companion, or bbuddy_create to design your own." },
       ],
     };
   }
 
-  if (name === "bbddy_observe") {
+  if (name === "bbuddy_observe") {
     const { summary, mode = 'both', user_id } = args as {
       summary: string; mode?: 'backseat' | 'skillcoach' | 'both'; user_id?: string;
     };
 
     const row = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
     if (!row) {
-      return { content: [{ type: "text", text: "No companion hatched yet! Use bbddy_hatch or bbddy_create first." }] };
+      return { content: [{ type: "text", text: "No companion hatched yet! Use bbuddy_hatch or bbuddy_create first." }] };
     }
 
     const companion = loadCompanion(row, user_id)!;
@@ -725,10 +725,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
   }
 
-  if (name === "bbddy_pet") {
+  if (name === "bbuddy_pet") {
     const row = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
     if (!row) {
-      return { content: [{ type: "text", text: "No companion to pet! Use bbddy_hatch or bbddy_create first." }] };
+      return { content: [{ type: "text", text: "No companion to pet! Use bbuddy_hatch or bbuddy_create first." }] };
     }
 
     const companion = loadCompanion(row)!;
@@ -777,10 +777,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     return { content: [{ type: "text", text: petDisplay }] };
   }
 
-  if (name === "bbddy_mute") {
+  if (name === "bbuddy_mute") {
     const row = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
     if (!row) {
-      return { content: [{ type: "text", text: "No companion to mute! Use bbddy_hatch or bbddy_create first." }] };
+      return { content: [{ type: "text", text: "No companion to mute! Use bbuddy_hatch or bbuddy_create first." }] };
     }
 
     db.prepare("UPDATE companions SET mood = 'muted' WHERE id = ?").run(row.id);
@@ -788,13 +788,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // Remove status file so statusline goes blank
     try { unlinkSync(BUDDY_STATUS_PATH); } catch { /* already gone */ }
 
-    return { content: [{ type: "text", text: `${row.name} has been muted. Use bbddy_unmute to bring it back.` }] };
+    return { content: [{ type: "text", text: `${row.name} has been muted. Use bbuddy_unmute to bring it back.` }] };
   }
 
-  if (name === "bbddy_unmute") {
+  if (name === "bbuddy_unmute") {
     const row = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
     if (!row) {
-      return { content: [{ type: "text", text: "No companion to unmute! Use bbddy_hatch or bbddy_create first." }] };
+      return { content: [{ type: "text", text: "No companion to unmute! Use bbuddy_hatch or bbuddy_create first." }] };
     }
 
     db.prepare("UPDATE companions SET mood = 'happy' WHERE id = ?").run(row.id);
@@ -804,7 +804,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     return { content: [{ type: "text", text: `${companion.name} is back! It'll chime in as you code.` }] };
   }
 
-  if (name === "bbddy_create") {
+  if (name === "bbuddy_create") {
     const wizardArgs = args as WizardArgs;
     const state = evaluateWizardState(wizardArgs);
 
@@ -832,12 +832,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     } else if (mode === '3') {
       // AI mode delegates generation to the host LLM (Claude Code / Codex).
       // The server returns instructions that the host model then fills in by
-      // calling bbddy_create again with appearance_mode '4' and manual frames.
+      // calling bbuddy_create again with appearance_mode '4' and manual frames.
       const { confirm, appearance_mode, ai_prompt, ...rest } = wizardArgs as any;
       return {
         content: [{
           type: "text",
-          text: buildAiDelegationPrompt('bbddy_create', wizardArgs.ai_prompt!, rest),
+          text: buildAiDelegationPrompt('bbuddy_create', wizardArgs.ai_prompt!, rest),
         }],
       };
     } else if (mode === '4' && wizardArgs.manual_frame1) {
@@ -904,10 +904,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
   }
 
-  if (name === "bbddy_evolve") {
+  if (name === "bbuddy_evolve") {
     const row = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
     if (!row) {
-      return { content: [{ type: "text", text: "No companion found. Use bbddy_hatch or bbddy_create first." }] };
+      return { content: [{ type: "text", text: "No companion found. Use bbuddy_hatch or bbuddy_create first." }] };
     }
 
     const evolveArgs = args as WizardArgs;
@@ -936,12 +936,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       if (!evolveArgs.ai_prompt) {
         return { content: [{ type: "text", text: renderWizardPrompt({ step: 'ai_prompt', completed: ['name','appearance_mode'], missing: ['ai_prompt'] }, { ...evolveArgs, name: row.name }) }] };
       }
-      // Delegate ASCII generation to the host LLM (same approach as bbddy_create).
+      // Delegate ASCII generation to the host LLM (same approach as bbuddy_create).
       const { confirm, appearance_mode, ai_prompt, ...rest } = evolveArgs as any;
       return {
         content: [{
           type: "text",
-          text: buildAiDelegationPrompt('bbddy_evolve', evolveArgs.ai_prompt, rest),
+          text: buildAiDelegationPrompt('bbuddy_evolve', evolveArgs.ai_prompt, rest),
         }],
       };
     } else if (mode === '4') {
@@ -979,12 +979,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 
   // ─── Slot save/list/summon/dismiss ────────────────────────────────────────
-  // Slots let users keep multiple bbddy companions on hand and swap between
+  // Slots let users keep multiple bbuddy companions on hand and swap between
   // them without losing state. Each slot stores a JSON snapshot of the
-  // companions row plus its custom_sprites row (if any). bbddy_summon
+  // companions row plus its custom_sprites row (if any). bbuddy_summon
   // auto-backs up the current companion to '__previous' before restoring.
 
-  if (name === "bbddy_save" || name === "bbddy_summon" || name === "bbddy_dismiss") {
+  if (name === "bbuddy_save" || name === "bbuddy_summon" || name === "bbuddy_dismiss") {
     const M = serverMessages();
     const slotArg = (args as { slot?: string }).slot;
     if (!slotArg || !slotArg.trim()) {
@@ -994,11 +994,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     if (slot.length > 24 || slot.length < 1) {
       return { content: [{ type: "text", text: M.slotNameLength }] };
     }
-    if (name !== "bbddy_summon" && slot.startsWith("__")) {
+    if (name !== "bbuddy_summon" && slot.startsWith("__")) {
       return { content: [{ type: "text", text: M.slotReserved }] };
     }
 
-    if (name === "bbddy_save") {
+    if (name === "bbuddy_save") {
       const row = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
       if (!row) {
         return { content: [{ type: "text", text: M.noCompanionToSave }] };
@@ -1011,7 +1011,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       return { content: [{ type: "text", text: M.slotSaved(row.name, slot) }] };
     }
 
-    if (name === "bbddy_summon") {
+    if (name === "bbuddy_summon") {
       const slotRow = db.prepare("SELECT * FROM companion_slots WHERE slot_name = ?").get(slot) as any;
       if (!slotRow) {
         return { content: [{ type: "text", text: M.slotMissing(slot) }] };
@@ -1054,7 +1054,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       return { content: [{ type: "text", text: M.summoned(companion.name, slot) }] };
     }
 
-    if (name === "bbddy_dismiss") {
+    if (name === "bbuddy_dismiss") {
       const slotRow = db.prepare("SELECT slot_name FROM companion_slots WHERE slot_name = ?").get(slot) as any;
       if (!slotRow) {
         return { content: [{ type: "text", text: M.slotDeleteMissing(slot) }] };
@@ -1064,7 +1064,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
   }
 
-  if (name === "bbddy_list") {
+  if (name === "bbuddy_list") {
     const M = serverMessages();
     const slots = db.prepare(
       "SELECT slot_name, companion_data, saved_at FROM companion_slots ORDER BY saved_at DESC",
@@ -1089,7 +1089,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     return { content: [{ type: "text", text: lines.join("\n") }] };
   }
 
-  if (name === "bbddy_language") {
+  if (name === "bbuddy_language") {
     const M = serverMessages();
     const { lang } = args as { lang?: string };
     if (!lang) {
@@ -1111,19 +1111,19 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
   return {
     resources: [
       {
-        uri: "bbddy://companion",
+        uri: "bbuddy://companion",
         name: "Current Companion Info",
         description: "The current state and personality of your Buddy.",
         mimeType: "application/json",
       },
       {
-        uri: "bbddy://status",
+        uri: "bbuddy://status",
         name: "Current Buddy Status Card",
         description: "An ASCII status card for the current Buddy, suitable for prompt injection.",
         mimeType: "text/plain",
       },
       {
-        uri: "bbddy://intro",
+        uri: "bbuddy://intro",
         name: "Companion System Prompt",
         description: "Text for injecting buddy context into the CLI's system prompt. Read this on startup.",
         mimeType: "text/plain",
@@ -1136,7 +1136,7 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
 server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   const { uri } = request.params;
 
-  if (uri === "bbddy://companion") {
+  if (uri === "bbuddy://companion") {
     const row = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
     if (!row) {
       return { contents: [{ uri, mimeType: "application/json", text: JSON.stringify({ message: "No companion hatched" }) }] };
@@ -1145,7 +1145,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     return { contents: [{ uri, mimeType: "application/json", text: JSON.stringify(companion) }] };
   }
 
-  if (uri === "bbddy://status") {
+  if (uri === "bbuddy://status") {
     const row = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
     if (!row) {
       return { contents: [{ uri, mimeType: "text/plain", text: "No companion hatched yet." }] };
@@ -1158,10 +1158,10 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     return { contents: [{ uri, mimeType: "text/plain", text: card }] };
   }
 
-  if (uri === "bbddy://intro") {
+  if (uri === "bbuddy://intro") {
     const row = db.prepare("SELECT * FROM companions LIMIT 1").get() as any;
     if (!row) {
-      return { contents: [{ uri, mimeType: "text/plain", text: "No companion hatched yet. Use bbddy_hatch or bbddy_create to get started." }] };
+      return { contents: [{ uri, mimeType: "text/plain", text: "No companion hatched yet. Use bbuddy_hatch or bbuddy_create to get started." }] };
     }
     const companion = loadCompanion(row)!;
     const peakStat = getPeakStat(companion.stats);
@@ -1171,7 +1171,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
 
 A small ${companion.species} named ${companion.name} watches from your terminal. ${companion.personalityBio}
 
-${companion.name} reacts to your work via the bbddy_observe tool. After completing an action, call bbddy_observe with a brief summary of what you did. ${companion.name}'s reactions are personality-flavored — ${peakStat} is their strength (${companion.stats[peakStat]}/100), ${dumpStat} is their weakness (${companion.stats[dumpStat]}/100).
+${companion.name} reacts to your work via the bbuddy_observe tool. After completing an action, call bbuddy_observe with a brief summary of what you did. ${companion.name}'s reactions are personality-flavored — ${peakStat} is their strength (${companion.stats[peakStat]}/100), ${dumpStat} is their weakness (${companion.stats[dumpStat]}/100).
 
 When the user addresses ${companion.name} by name, respond briefly in character as ${companion.name} before your normal response. Don't explain that you're not ${companion.name} — they know.`;
 

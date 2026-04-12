@@ -1,6 +1,6 @@
 {
-  "name": "bbddy",
-  "displayName": "bbddy — Create Your Companion",
+  "name": "bbuddy",
+  "displayName": "bbuddy — Create Your Companion",
   "description": "직접 만드는 코딩 컴패니언 — AI ASCII 생성, 파츠 조합, 수동 스탯 분배",
   "version": "0.1.0",
   "author": {
@@ -10,6 +10,6 @@
   "skills": "skills",
   "hooks": "hooks",
   "mcp": {
-    "serverName": "bbddy"
+    "serverName": "bbuddy"
   }
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * bbddy PostToolUse hook
+ * bbuddy PostToolUse hook
  * Reacts to Bash tool results:
  *   - Success → excited reaction (★ eye, positive text)
  *   - Failure → concerned reaction (>.<  eye, supportive text)
@@ -10,14 +10,14 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { createRequire } from 'module';
 
-const STATUS_PATH = join(homedir(), '.claude', 'bbddy-status.json');
+const STATUS_PATH = join(homedir(), '.claude', 'bbuddy-status.json');
 const REACTION_TTL_MS = 20_000;
 
 function getLang() {
   try {
     const _require = createRequire(import.meta.url);
-    const Database = _require(join(homedir(), '.bbddy', 'server', 'node_modules', 'better-sqlite3'));
-    const db = new Database(join(homedir(), '.bbddy', 'bbddy.db'), { readonly: true });
+    const Database = _require(join(homedir(), '.bbuddy', 'server', 'node_modules', 'better-sqlite3'));
+    const db = new Database(join(homedir(), '.bbuddy', 'bbuddy.db'), { readonly: true });
     const row = db.prepare("SELECT value FROM settings WHERE key = 'language'").get();
     db.close();
     if (row?.value === 'ko' || row?.value === 'en') return row.value;

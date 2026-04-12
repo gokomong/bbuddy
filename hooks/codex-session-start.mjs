@@ -1,25 +1,38 @@
 #!/usr/bin/env node
 /**
- * bbddy Codex SessionStart hook
- * Injects companion context into Codex session.
- * Same logic as session-start.mjs but tailored for Codex's instruction format.
+ * bbuddy Codex SessionStart hook
+ *
+ * Windows Codex accepts structured JSON here when the payload matches the
+ * SessionStart schema exactly. The useful path is
+ * hookSpecificOutput.additionalContext.
  */
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 
-const STATUS_PATH = join(homedir(), '.claude', 'bbddy-status.json');
+const STATUS_PATH = join(homedir(), '.claude', 'bbuddy-status.json');
 
-let input = {};
+function emitAdditionalContext(text) {
+  process.stdout.write(JSON.stringify({
+    continue: true,
+    hookSpecificOutput: {
+      hookEventName: 'SessionStart',
+      additionalContext: text,
+    },
+  }));
+}
+
 try {
   const raw = readFileSync(0, 'utf-8');
-  if (raw.trim()) input = JSON.parse(raw);
-} catch { /* non-fatal */ }
+  if (raw.trim()) JSON.parse(raw);
+} catch {
+  // Ignore malformed hook stdin and fail open.
+}
 
 if (!existsSync(STATUS_PATH)) {
-  console.log(
-    'bbddy: No companion found.\n' +
-    'Call bbddy_create to create your companion.'
+  emitAdditionalContext(
+    'bbuddy: No companion found.\n' +
+    'Call bbuddy_create to create your companion.'
   );
   process.exit(0);
 }
@@ -42,9 +55,11 @@ try {
 
   lines.push('');
   lines.push('Rules:');
-  lines.push('- On meaningful moments (errors, successes, refactors), append <!-- bbddy: {reaction ≤15 chars} --> at the end of your response.');
+  lines.push('- On meaningful moments (errors, successes, refactors), append <!-- bbuddy: {reaction <=15 chars} --> at the end of your response.');
   lines.push('- Match the companion personality tone. Do not add it every message.');
-  lines.push('- Call bbddy_status at session start to check companion state.');
+  lines.push('- Call bbuddy_status at session start to check companion state.');
 
-  console.log(lines.join('\n'));
-} catch { /* non-fatal */ }
+  emitAdditionalContext(lines.join('\n'));
+} catch {
+  // If the state file is broken, fail open and let Codex continue.
+}

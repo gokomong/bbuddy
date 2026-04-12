@@ -1,5 +1,5 @@
 // src/creator/stats.ts
-// Manual stat distribution validator for bbddy_create
+// Manual stat distribution validator for bbuddy_create
 
 import { type StatName, STAT_NAMES } from '../lib/types.js';
 

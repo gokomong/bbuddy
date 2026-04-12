@@ -1,11 +1,11 @@
 ---
 name: dismiss
-description: Permanently delete a saved bbddy slot
+description: Permanently delete a saved bbuddy slot
 ---
 
-# /bbddy:dismiss — 저장된 슬롯 삭제
+# /bbuddy:dismiss — 저장된 슬롯 삭제
 
-사용자가 `/bbddy:dismiss <slot>` 을 입력하면 이 스킬을 실행한다.
+사용자가 `/bbuddy:dismiss <slot>` 을 입력하면 이 스킬을 실행한다.
 
 ## 역할
 
@@ -14,7 +14,7 @@ description: Permanently delete a saved bbddy slot
 ## 실행
 
 ```
-bbddy_dismiss({ slot: "<사용자가-지정한-이름>" })
+bbuddy_dismiss({ slot: "<사용자가-지정한-이름>" })
 ```
 
 존재하지 않는 슬롯이면 그렇게 안내한다. 인자가 없으면 어떤 슬롯을 지울지 물어본다.

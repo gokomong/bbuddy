@@ -1,4 +1,4 @@
-// i18n: bbddy supports English (default) and Korean.
+// i18n: bbuddy supports English (default) and Korean.
 // Language is stored in the `settings` table under the key 'language'.
 // Strings are organized into catalogs indexed by language code.
 

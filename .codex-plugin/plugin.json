@@ -1,6 +1,6 @@
 {
-  "name": "bbddy",
-  "displayName": "bbddy — Create Your Companion",
+  "name": "bbuddy",
+  "displayName": "bbuddy — Create Your Companion",
   "description": "Create and grow your own coding companion — AI ASCII generation, parts assembly, custom stats",
   "version": "0.1.0",
   "author": {
@@ -21,6 +21,6 @@
     }
   },
   "mcp": {
-    "serverName": "bbddy"
+    "serverName": "bbuddy"
   }
 }

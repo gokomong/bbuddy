@@ -1,5 +1,5 @@
 // src/creator/presets.ts
-// Personality preset definitions for bbddy_create wizard
+// Personality preset definitions for bbuddy_create wizard
 
 import { type PersonalityPreset, type StatName, STAT_NAMES, getPeakStat, getDumpStat } from '../lib/types.js';
 import { getLang } from '../i18n/index.js';

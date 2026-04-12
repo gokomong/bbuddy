@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
- * bbddy Stop hook
- * Scans the conversation transcript for <!-- bbddy: ... --> comments.
+ * bbuddy Stop hook
+ * Scans the conversation transcript for <!-- bbuddy: ... --> comments.
  * Writes the last found reaction to the status file so the statusline shows it.
  */
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 
-const STATUS_PATH = join(homedir(), '.claude', 'bbddy-status.json');
+const STATUS_PATH = join(homedir(), '.claude', 'bbuddy-status.json');
 const REACTION_TTL_MS = 30_000;
 
 // Read hook input from stdin
@@ -35,7 +35,7 @@ try {
           .join('')
       : (msg.content ?? '');
 
-    const matches = [...text.matchAll(/<!--\s*bbddy:\s*(.+?)\s*-->/g)];
+    const matches = [...text.matchAll(/<!--\s*bbuddy:\s*(.+?)\s*-->/g)];
     if (matches.length > 0) {
       lastReaction = matches[matches.length - 1][1].trim();
     }

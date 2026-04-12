@@ -15,7 +15,7 @@ const PAD_CHAR = "\u2800";
 // with stdin redirected, so process.stdout.columns is undefined. We query
 // the host: PowerShell on Windows, stty on Unix. Result is cached to avoid
 // paying the ~400ms shell spawn on every render.
-const TERM_COLS_CACHE_PATH = join(homedir(), ".claude", "bbddy-term-cols.json");
+const TERM_COLS_CACHE_PATH = join(homedir(), ".claude", "bbuddy-term-cols.json");
 // Short TTL so terminal resizes are reflected within ~1s. PowerShell spawn
 // is ~255ms which fits comfortably inside Claude Code's statusline refresh
 // interval (usually 1–5s).
@@ -27,7 +27,7 @@ const TERM_COLS_DEFAULT = 120;
 // and stop at the first hit. All results must be > 40 to guard against
 // emulators that hand back nonsense "default" sizes.
 function detectTermColsUncached(): number | null {
-  const override = Number(process.env.BBDDY_TERM_COLS);
+  const override = Number(process.env.BBUDDY_TERM_COLS);
   if (override > 0) return override;
 
   // tmux: cheapest, reports the live pane width.
@@ -99,7 +99,7 @@ function detectTermColsUncached(): number | null {
 // which case the caller should keep the buddy close to the HUD rather
 // than right-align blindly).
 function detectTermCols(): number | null {
-  const override = Number(process.env.BBDDY_TERM_COLS);
+  const override = Number(process.env.BBUDDY_TERM_COLS);
   if (override > 0) return override;
 
   try {
@@ -125,7 +125,7 @@ const GREEN = "\x1b[32m";
 const MAGENTA = "\x1b[35m";
 
 const toUnix = (p: string) => p.replace(/\\/g, "/");
-const BUDDY_STATUS_PATH = join(homedir(), ".claude", "bbddy-status.json");
+const BUDDY_STATUS_PATH = join(homedir(), ".claude", "bbuddy-status.json");
 const FRAME_INTERVAL_MS = 800;
 
 // True randomness for animation — each render picks a fresh random value.
@@ -517,8 +517,8 @@ if (buddyRight.length === 0) {
   // etc). The terminal emulator reports the full pane width but our actual
   // usable statusline area is narrower. Subtract a fixed reservation so
   // right-aligned lines never sit past Claude Code's render edge.
-  const CLAUDE_RESERVATION = Number(process.env.BBDDY_CLAUDE_RESERVATION) || 10;
-  const MARGIN = Number(process.env.BBDDY_RIGHT_MARGIN) || 1;
+  const CLAUDE_RESERVATION = Number(process.env.BBUDDY_CLAUDE_RESERVATION) || 10;
+  const MARGIN = Number(process.env.BBUDDY_RIGHT_MARGIN) || 1;
   let padWidth: number;
   let dropHud = false;
   if (termCols !== null) {

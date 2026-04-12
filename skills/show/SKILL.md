@@ -1,20 +1,20 @@
 ---
 name: show
-description: Show your bbddy companion's status card
+description: Show your bbuddy companion's status card
 ---
 
-# /bbddy:show — 컴패니언 상태 카드 표시
+# /bbuddy:show — 컴패니언 상태 카드 표시
 
-사용자가 `/bbddy:show` 를 입력하면 이 스킬을 실행한다.
+사용자가 `/bbuddy:show` 를 입력하면 이 스킬을 실행한다.
 
 ## 역할
 
-`bbddy_status` MCP 도구를 호출해서 현재 컴패니언의 상태 카드를 보여준다.
+`bbuddy_status` MCP 도구를 호출해서 현재 컴패니언의 상태 카드를 보여준다.
 
 ## 실행
 
 ```
-bbddy_status({})
+bbuddy_status({})
 ```
 
 결과를 그대로 사용자에게 표시한다. 별도 설명 없이 카드만 출력하면 된다.

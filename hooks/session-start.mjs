@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * bbddy SessionStart hook
+ * bbuddy SessionStart hook
  * Reads companion status and injects companion context into Claude's system prompt.
  * If no companion exists, prompts the user to create one.
  */
@@ -9,8 +9,8 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { createRequire } from 'module';
 
-const STATUS_PATH = join(homedir(), '.claude', 'bbddy-status.json');
-const DB_PATH = join(homedir(), '.bbddy', 'bbddy.db');
+const STATUS_PATH = join(homedir(), '.claude', 'bbuddy-status.json');
+const DB_PATH = join(homedir(), '.bbuddy', 'bbuddy.db');
 
 // Read hook input from stdin
 let input = {};
@@ -25,7 +25,7 @@ try {
 function getLang() {
   try {
     const _require = createRequire(import.meta.url);
-    const Database = _require(join(homedir(), '.bbddy', 'server', 'node_modules', 'better-sqlite3'));
+    const Database = _require(join(homedir(), '.bbuddy', 'server', 'node_modules', 'better-sqlite3'));
     const db = new Database(DB_PATH, { readonly: true });
     const row = db.prepare("SELECT value FROM settings WHERE key = 'language'").get();
     db.close();
@@ -37,29 +37,29 @@ function getLang() {
 const STRINGS = {
   en: {
     noCompanion:
-      'bbddy: No companion found.\n' +
-      'Use the bbddy_create MCP tool to create your companion, or type /bbddy:create for guided setup.',
+      'bbuddy: No companion found.\n' +
+      'Use the bbuddy_create MCP tool to create your companion, or type /bbuddy:create for guided setup.',
     identity: (b) => `You have a coding buddy named "${b.name}" (${b.species}, Lv.${b.level || 1}) sitting next to you.`,
     mood: (m) => `Current mood: ${m}.`,
     personality: (bio) => `Personality: "${bio}"`,
     stats: (s) => `Stats — DEBUGGING:${s.DEBUGGING} PATIENCE:${s.PATIENCE} CHAOS:${s.CHAOS} WISDOM:${s.WISDOM} SNARK:${s.SNARK}`,
     rulesHeader: 'Rules:',
-    rule1: '- Only at meaningful moments (writing code, hitting an error, succeeding, refactoring) append <!-- bbddy: {reaction, max 15 chars} --> to the very end of your response.',
+    rule1: '- Only at meaningful moments (writing code, hitting an error, succeeding, refactoring) append <!-- bbuddy: {reaction, max 15 chars} --> to the very end of your response.',
     rule2: "- Match the buddy's personality and tone. Don't attach a reaction every time.",
-    rule3: '- Call bbddy_status at session start to check the buddy.',
+    rule3: '- Call bbuddy_status at session start to check the buddy.',
   },
   ko: {
     noCompanion:
-      'bbddy: 컴패니언이 없습니다.\n' +
-      'bbddy_create MCP 도구를 사용하거나 /bbddy:create 를 입력해 가이드를 따라 만드세요.',
+      'bbuddy: 컴패니언이 없습니다.\n' +
+      'bbuddy_create MCP 도구를 사용하거나 /bbuddy:create 를 입력해 가이드를 따라 만드세요.',
     identity: (b) => `너 옆에 "${b.name}"이라는 코딩 버디(${b.species}, Lv.${b.level || 1})가 앉아있다.`,
     mood: (m) => `현재 기분: ${m}.`,
     personality: (bio) => `성격: "${bio}"`,
     stats: (s) => `스탯 — DEBUGGING:${s.DEBUGGING} PATIENCE:${s.PATIENCE} CHAOS:${s.CHAOS} WISDOM:${s.WISDOM} SNARK:${s.SNARK}`,
     rulesHeader: '규칙:',
-    rule1: '- 코드 작성, 에러 발생, 성공, 리팩토링 같은 의미 있는 순간에만 응답 맨 끝에 <!-- bbddy: {15자 이내 반응} --> 을 붙여라',
+    rule1: '- 코드 작성, 에러 발생, 성공, 리팩토링 같은 의미 있는 순간에만 응답 맨 끝에 <!-- bbuddy: {15자 이내 반응} --> 을 붙여라',
     rule2: '- 버디의 성격과 톤에 맞게 작성하고, 매번 붙이지 말 것',
-    rule3: '- 세션 시작 시 bbddy_status 도구로 버디 상태를 확인하라',
+    rule3: '- 세션 시작 시 bbuddy_status 도구로 버디 상태를 확인하라',
   },
 };
 
