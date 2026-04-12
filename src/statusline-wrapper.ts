@@ -330,7 +330,12 @@ if (buddyRight.length === 0) {
   // wraps them into the next visual row and clobbers the footer. Keeping a
   // conservative margin prevents that wrap. Override with BBDDY_TERM_COLS if
   // the detected width doesn't match Claude Code's actual usable area.
-  const MARGIN = Number(process.env.BBDDY_RIGHT_MARGIN) || 25;
+  // Small safety margin so no line sits exactly on the terminal edge and
+  // accidentally wraps. /effort and the accept-edits indicator live on the
+  // FOOTER row, not the statusline rows, so they're only affected if our
+  // lines wrap into their row. A 3-column cushion is enough for wide-char
+  // safety without leaving visible empty space on the right.
+  const MARGIN = Number(process.env.BBDDY_RIGHT_MARGIN) || 3;
   const rightAlignedPad = termCols - maxBuddyWidth - MARGIN;
   // Always keep the buddy at least 'gutter' columns to the right of the HUD
   // so it never backs up over the HUD text.
