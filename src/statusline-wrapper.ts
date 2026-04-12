@@ -224,11 +224,14 @@ try {
       const totalFrames = frames.length;
       const hasReaction = buddy.reaction_expires && Date.now() < buddy.reaction_expires;
 
-      // Organic frame selection — pseudo-random, not fixed timer
-      // Each render picks a frame based on hashed time + buddy name
-      // This makes the buddy feel alive, not mechanical
+      // Organic frame selection. We derive a pseudo-random in [0,1) from
+      // the current time bucket (2.5s wide) so the frame stays stable for
+      // a couple of seconds before rolling again. With a 1s statusline
+      // refresh, true Math.random() every render made the buddy look like
+      // it was flickering — this keeps motion calm while still varied.
       let frameIndex: number;
-      const r = Math.random();
+      const bucket = Math.floor(Date.now() / 2500);
+      const r = ((bucket * 2654435761) >>> 0) % 1000 / 1000;
 
       if (hasReaction && (buddy.reaction === 'excited' || buddy.reaction === 'impressed')) {
         // Energetic: any frame, biased toward expressive (1-4)
@@ -307,8 +310,10 @@ try {
       }
 
       // --- Micro-expression: append tiny ASCII particle to last art line ---
+      // Stable for 4s windows so the particle doesn't strobe at 1s refresh.
       const hasReactionActive = buddy.reaction_expires && Date.now() < buddy.reaction_expires;
-      const microR = Math.random();
+      const microBucket = Math.floor(Date.now() / 4000);
+      const microR = ((microBucket * 1597334677) >>> 0) % 1000 / 1000;
       const microParticles = ['', '', '~', '', '*', '', '.', '♪', '', 'z', '·', ''];
       if (!hasReactionActive) {
         const particle = microParticles[Math.floor(microR * microParticles.length)];
@@ -330,7 +335,10 @@ try {
       };
       const defaultAmbient = ['· watching your cursor', '· counting semicolons', '· sniffing the git log', '· dreaming of v2.0', '· vibing'];
       const ambientPool = speciesAmbient[buddy.species] || defaultAmbient;
-      const ambientR = Math.random();
+      // Ambient text rotates on a slow bucket so the user reads a full
+      // phrase before it changes instead of strobing every refresh.
+      const ambientBucket = Math.floor(Date.now() / 15_000);
+      const ambientR = ((ambientBucket * 374761393) >>> 0) % 1000 / 1000;
       const ambientText = hasReactionActive ? '' : `${DIM}${ambientPool[Math.floor(ambientR * ambientPool.length)]}${RESET}`;
 
       const shinyTag = buddy.is_shiny ? " ✨" : "";
