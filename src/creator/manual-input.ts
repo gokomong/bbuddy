@@ -13,7 +13,11 @@ const MAX_COLS = 14;
 const MAX_ROWS = 6;
 
 function parseFrame(text: string): string[] {
-  return text
+  // Normalize: accept both real newlines AND literal "\n" escape sequences.
+  // MCP tool callers occasionally pass the 2-char form; fall back to splitting
+  // on it so the frame isn't collapsed into a single truncated line.
+  const normalized = text.replace(/\\n/g, '\n');
+  return normalized
     .split('\n')
     .slice(0, MAX_ROWS)
     .map(l => l.slice(0, MAX_COLS));

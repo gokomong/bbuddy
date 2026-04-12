@@ -107,6 +107,15 @@ describe('parseManualInput', () => {
     }
   });
 
+  it('handles literal \\n escape sequences (not real newlines)', () => {
+    // Some MCP callers pass the 2-char form `\n` instead of a real newline.
+    // parseFrame should normalize both forms identically so the frame isn't
+    // collapsed into one truncated line.
+    const literal = 'line1\\nline2\\nline3';
+    const sprite = parseManualInput({ frame1: literal });
+    expect(sprite.idleFrames[0]).toEqual(['line1', 'line2', 'line3']);
+  });
+
   it('has happyFrame, sadFrame, workingFrame', () => {
     const sprite = parseManualInput({ frame1: '( ·.· )' });
     expect(Array.isArray(sprite.happyFrame)).toBe(true);
