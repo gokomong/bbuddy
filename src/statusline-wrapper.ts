@@ -134,6 +134,44 @@ const FRAME_INTERVAL_MS = 800;
 // Strip ANSI codes for width calculation
 const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "");
 
+// Speech bubble — word-wrap + ASCII box, inspired by claude-buddy.
+// Returns the bubble lines (no ANSI), plus the index of the middle text row
+// so the renderer can place a `--` connector pointing at the buddy's mouth.
+function buildSpeechBubble(text: string, innerW = 28): { lines: string[]; connectorIdx: number; width: number } {
+  if (!text) return { lines: [], connectorIdx: -1, width: 0 };
+
+  // Word wrap. Don't try to be clever with CJK width — just byte-wise wrap.
+  const words = text.split(/\s+/).filter(Boolean);
+  const textLines: string[] = [];
+  let cur = "";
+  for (const word of words) {
+    if (!cur) {
+      cur = word;
+    } else if (cur.length + 1 + word.length <= innerW) {
+      cur = cur + " " + word;
+    } else {
+      textLines.push(cur);
+      cur = word;
+    }
+  }
+  if (cur) textLines.push(cur);
+  if (textLines.length === 0) return { lines: [], connectorIdx: -1, width: 0 };
+
+  const border = "-".repeat(innerW + 2);
+  const lines: string[] = [`.${border}.`];
+  for (const tl of textLines) {
+    const pad = " ".repeat(Math.max(0, innerW - tl.length));
+    lines.push(`| ${tl}${pad} |`);
+  }
+  lines.push(`\`${border}'`);
+
+  // Connector points at the middle text row (skip top + bottom borders).
+  const firstText = 1;
+  const lastText = lines.length - 2;
+  const connectorIdx = Math.floor((firstText + lastText) / 2);
+  return { lines, connectorIdx, width: innerW + 4 };
+}
+
 // Read stdin from Claude Code
 let stdinData = "";
 try {
@@ -346,20 +384,47 @@ try {
       const stars = buddy.rarity_stars || '';
       const nameIndicator = reactionIndicator ? `${YELLOW}${reactionIndicator}${RESET}` : '';
       const nameInfo = `${CYAN}${buddy.name}${nameIndicator}${RESET} ${DIM}(${buddy.species})${RESET} ${YELLOW}Lv.${buddy.level}${shinyTag}${RESET}`;
-      const reactionSuffix = reactionText ? `  ${DIM}"${reactionText}"${RESET}` : '';
-      const moodInfo = `${moodColor(buddy.mood)}${buddy.mood}${RESET} ${DIM}XP:${RESET}${buddy.xp} ${rarityColor}${stars}${RESET}${reactionSuffix}`;
+      const moodInfo = `${moodColor(buddy.mood)}${buddy.mood}${RESET} ${DIM}XP:${RESET}${buddy.xp} ${rarityColor}${stars}${RESET}`;
+
+      // Build a speech bubble if the buddy has an active reaction text. The
+      // bubble sits to the LEFT of the art with a `--` connector pointing at
+      // the buddy's mouth, vertically centered against the art.
+      const bubble = reactionText ? buildSpeechBubble(reactionText) : { lines: [], connectorIdx: -1, width: 0 };
+      const bubbleStart = bubble.lines.length > 0 && bubble.lines.length < asciiLines.length
+        ? Math.floor((asciiLines.length - bubble.lines.length) / 2)
+        : 0;
 
       const artWidth = Math.max(...asciiLines.map((l: string) => l.length));
-      for (let i = 0; i < asciiLines.length; i++) {
-        const artPart = `${MAGENTA}${(asciiLines[i] || "").padEnd(artWidth)}${RESET}`;
-        if (i === 0) {
-          buddyRight.push(`${artPart} ${nameInfo}`);
-        } else if (i === 1) {
-          buddyRight.push(`${artPart} ${moodInfo}`);
-        } else if (i === 2 && ambientText) {
-          buddyRight.push(`${artPart} ${ambientText}`);
-        } else {
-          buddyRight.push(artPart);
+      const totalRows = Math.max(asciiLines.length, bubbleStart + bubble.lines.length);
+      for (let i = 0; i < totalRows; i++) {
+        const artLine = asciiLines[i] || "";
+        const artPart = `${MAGENTA}${artLine.padEnd(artWidth)}${RESET}`;
+
+        // Bubble piece for this row, if any.
+        let bubblePiece = "";
+        if (bubble.lines.length > 0) {
+          const bi = i - bubbleStart;
+          if (bi >= 0 && bi < bubble.lines.length) {
+            const bline = bubble.lines[bi]!;
+            const isBorder = bi === 0 || bi === bubble.lines.length - 1;
+            const colored = isBorder
+              ? `${rarityColor}${bline}${RESET}`
+              : `${rarityColor}${bline[0]}${RESET}${DIM}${bline.slice(1, -1)}${RESET}${rarityColor}${bline.slice(-1)}${RESET}`;
+            const connector = bi === bubble.connectorIdx ? `${rarityColor}--${RESET} ` : "   ";
+            bubblePiece = `${colored}${connector}`;
+          } else {
+            bubblePiece = " ".repeat(bubble.width) + "   ";
+          }
+        }
+
+        // Info text on the right of art (only on the first 2-3 rows where art is present).
+        let infoSuffix = "";
+        if (i === 0) infoSuffix = ` ${nameInfo}`;
+        else if (i === 1) infoSuffix = ` ${moodInfo}`;
+        else if (i === 2 && ambientText && !reactionText) infoSuffix = ` ${ambientText}`;
+
+        if (artLine || bubblePiece) {
+          buddyRight.push(`${bubblePiece}${artPart}${infoSuffix}`);
         }
       }
     }
