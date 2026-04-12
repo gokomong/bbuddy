@@ -331,17 +331,13 @@ if (buddyRight.length === 0) {
   const termCols = detectTermCols();
   const minSideBySideWidth = maxHudWidth + gutter + maxBuddyWidth;
   const useSideBySide = minSideBySideWidth <= termCols;
-  // Right-align is opt-in: BBDDY_RIGHT_ALIGN=1 pushes the buddy to the
-  // terminal edge (minus MARGIN for Claude Code's own footer indicators).
-  // The default stays close to the HUD with a fixed gutter because Claude
-  // Code's usable statusline area is smaller than the raw terminal width,
-  // and anchoring to the far right tends to collide with its UI chrome.
+  // Right-align: push the buddy so its right edge lands near the terminal
+  // edge, but leave MARGIN columns of breathing room for Claude Code's own
+  // footer elements like /effort / "accept edits" indicators. Clamp so we
+  // never back up underneath the HUD.
   const MARGIN = 8;
-  const wantRightAlign = process.env.BBDDY_RIGHT_ALIGN === '1';
   const rightAlignedPad = termCols - maxBuddyWidth - MARGIN;
-  const padWidth = wantRightAlign
-    ? Math.max(maxHudWidth + gutter, rightAlignedPad)
-    : maxHudWidth + gutter;
+  const padWidth = Math.max(maxHudWidth + gutter, rightAlignedPad);
 
   if (useSideBySide) {
     // Side-by-side layout. Use Braille Blank padding so Claude Code's
