@@ -12,4 +12,3 @@ export {
 } from './wizard.js';
 export { combineParts, listPartsOptions, eyeCharFor, type PartsSelection, type CustomSprite } from './parts-combiner.js';
 export { parseManualInput, renderManualPreview, type ManualSpriteInput } from './manual-input.js';
-export { generateAsciiArt, type ArtGenerationRequest, type ArtGenerationResult } from './ai-generator.js';

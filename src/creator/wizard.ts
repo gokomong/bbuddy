@@ -5,7 +5,6 @@ import { SPECIES_LIST } from '../lib/species.js';
 import { PERSONALITY_PRESETS, STAT_NAMES } from '../lib/types.js';
 import { PRESETS } from './presets.js';
 import { validateStatDistribution, STAT_POOL, STAT_MIN, STAT_MAX } from './stats.js';
-import { type ArtGenerationResult } from './ai-generator.js';
 
 export type AppearanceMode = '1' | '2' | '3' | '4';
 
@@ -30,7 +29,6 @@ export type WizardArgs = {
   parts?: { face?: string; eye?: string; accessory?: string; body?: string };
   // Mode 3
   ai_prompt?: string;
-  ai_result?: ArtGenerationResult;
   // Mode 4
   manual_frame1?: string;
   manual_frame2?: string;
@@ -147,7 +145,7 @@ export function renderWizardPrompt(state: WizardState, args: WizardArgs): string
     lines.push(``);
     lines.push(`  1  기본 종족     기존 21종 중 선택`);
     lines.push(`  2  파츠 조합     얼굴+눈+악세+몸통 모듈 조합`);
-    lines.push(`  3  AI로 생성     프롬프트 → Claude가 ASCII 생성 (ANTHROPIC_API_KEY 필요)`);
+    lines.push(`  3  AI로 생성     프롬프트 → 호스트 LLM(Claude Code/Codex)이 ASCII 생성`);
     lines.push(`  4  직접 타이핑   한 줄씩 직접 입력`);
 
   } else if (state.step === 'species') {
@@ -192,7 +190,7 @@ export function renderWizardPrompt(state: WizardState, args: WizardArgs): string
     lines.push(`    "졸린 표정의 곰"`);
     lines.push(`    "왕관 쓴 개구리"`);
     lines.push(``);
-    lines.push(`  ANTHROPIC_API_KEY 환경변수가 설정돼 있어야 합니다.`);
+    lines.push(`  호스트 LLM(Claude Code / Codex)이 직접 그림을 만듭니다. 별도 API 키 불필요.`);
 
   } else if (state.step === 'manual') {
     lines.push(`  [2/4] 외형 — 직접 입력`);

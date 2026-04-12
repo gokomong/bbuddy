@@ -23,7 +23,6 @@ import { generatePresetBio, PRESETS } from "../creator/presets.js";
 import { validateStatDistribution, normaliseStats } from "../creator/stats.js";
 import { combineParts, type PartsSelection } from "../creator/parts-combiner.js";
 import { parseManualInput } from "../creator/manual-input.js";
-import { generateAsciiArt } from "../creator/ai-generator.js";
 import { randomUUID } from "crypto";
 import { writeFileSync, mkdirSync, unlinkSync } from "fs";
 import { join } from "path";
@@ -219,6 +218,46 @@ function hatchAnimation(companion: Companion, customFrames?: string[]): string {
   ].join('\n');
 }
 
+// Instruct the host LLM (Claude Code / Codex) to generate ASCII frames and
+// call the tool back with manual_frame1/2/3. Avoids needing a separate API key
+// since the host is already a capable model with its own billing.
+function buildAiDelegationPrompt(
+  tool: 'bbddy_create' | 'bbddy_evolve',
+  description: string,
+  otherArgs: Record<string, unknown>,
+): string {
+  const baseArgs = {
+    ...otherArgs,
+    appearance_mode: '4',
+    ai_prompt: description,
+  };
+  const callTemplate = JSON.stringify(
+    { ...baseArgs, manual_frame1: '<frame 1>', manual_frame2: '<frame 2>', manual_frame3: '<frame 3>' },
+    null,
+    2,
+  );
+  return [
+    `🎨 AI 모드 — 호스트 모델이 직접 ASCII 아트를 그립니다.`,
+    ``,
+    `캐릭터 설명: "${description}"`,
+    ``,
+    `제약:`,
+    `- 최대 6줄, 줄당 최대 14자`,
+    `- ASCII + 유니코드 문자만 사용 (이모지는 지양)`,
+    `- frame1 = idle, frame2 = blink/wink, frame3 = expression (wiggle/stretch 등)`,
+    `- 세 프레임 모두 같은 실루엣, 눈/입/팔 같은 세부만 살짝 다르게`,
+    ``,
+    `다음 단계: 위 제약에 맞게 3개 프레임을 만들고, 바로 ${tool}을 아래 형태로 다시 호출하세요:`,
+    ``,
+    '```json',
+    callTemplate,
+    '```',
+    ``,
+    `프레임 문자열에는 실제 줄바꿈 또는 "\\n" 이스케이프 시퀀스를 써도 됩니다.`,
+    `confirm을 붙이지 않으면 미리보기만 보여줍니다.`,
+  ].join('\n');
+}
+
 function writeBuddyStatus(
   companion: Companion,
   reaction?: { state: string; text: string; expires: number; eyeOverride?: string; indicator?: string },
@@ -317,7 +356,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 accessory: { type: "string" }, body: { type: "string" },
               },
             },
-            ai_prompt: { type: "string", description: "Mode 3: character description for AI ASCII generation. Requires ANTHROPIC_API_KEY env var." },
+            ai_prompt: { type: "string", description: "Mode 3: character description. The host LLM (Claude Code / Codex) generates the frames and calls the tool back with manual_frame1/2/3." },
             manual_frame1: { type: "string", description: "Mode 4: sprite lines separated by \\n (required, max 6 lines × 14 chars)." },
             manual_frame2: { type: "string", description: "Mode 4: frame 2 (optional, auto-generated if omitted)." },
             manual_frame3: { type: "string", description: "Mode 4: frame 3 (optional, auto-generated if omitted)." },
@@ -739,21 +778,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       customSprite = combineParts(wizardArgs.parts as PartsSelection);
       speciesForDb = 'Custom';
     } else if (mode === '3') {
-      if ((wizardArgs as any).ai_result) {
-        customSprite = (wizardArgs as any).ai_result as CustomSprite;
-        speciesForDb = 'Custom';
-      } else {
-        const apiKey = process.env['ANTHROPIC_API_KEY'];
-        if (!apiKey) {
-          return { content: [{ type: "text", text: "⚠ ANTHROPIC_API_KEY 환경변수가 없습니다. 모드 1/2/4를 사용하거나 API key를 설정하세요." }] };
-        }
-        const result = await generateAsciiArt({ prompt: wizardArgs.ai_prompt! }, apiKey);
-        if (!result) {
-          return { content: [{ type: "text", text: "⚠ AI ASCII 생성 실패. 다시 시도하거나 다른 모드를 사용하세요." }] };
-        }
-        customSprite = result;
-        speciesForDb = 'Custom';
-      }
+      // AI mode delegates generation to the host LLM (Claude Code / Codex).
+      // The server returns instructions that the host model then fills in by
+      // calling bbddy_create again with appearance_mode '4' and manual frames.
+      const { confirm, appearance_mode, ai_prompt, ...rest } = wizardArgs as any;
+      return {
+        content: [{
+          type: "text",
+          text: buildAiDelegationPrompt('bbddy_create', wizardArgs.ai_prompt!, rest),
+        }],
+      };
     } else if (mode === '4' && wizardArgs.manual_frame1) {
       customSprite = parseManualInput({
         frame1: wizardArgs.manual_frame1,
@@ -850,16 +884,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       if (!evolveArgs.ai_prompt) {
         return { content: [{ type: "text", text: renderWizardPrompt({ step: 'ai_prompt', completed: ['name','appearance_mode'], missing: ['ai_prompt'] }, { ...evolveArgs, name: row.name }) }] };
       }
-      const apiKey = process.env['ANTHROPIC_API_KEY'];
-      if (!apiKey) {
-        return { content: [{ type: "text", text: "⚠ ANTHROPIC_API_KEY 환경변수가 없습니다." }] };
-      }
-      const result = await generateAsciiArt({ prompt: evolveArgs.ai_prompt }, apiKey);
-      if (!result) {
-        return { content: [{ type: "text", text: "⚠ AI ASCII 생성 실패. 다시 시도하세요." }] };
-      }
-      newCustomSprite = result;
-      newSpecies = 'Custom';
+      // Delegate ASCII generation to the host LLM (same approach as bbddy_create).
+      const { confirm, appearance_mode, ai_prompt, ...rest } = evolveArgs as any;
+      return {
+        content: [{
+          type: "text",
+          text: buildAiDelegationPrompt('bbddy_evolve', evolveArgs.ai_prompt, rest),
+        }],
+      };
     } else if (mode === '4') {
       if (!evolveArgs.manual_frame1) {
         return { content: [{ type: "text", text: renderWizardPrompt({ step: 'manual', completed: ['name','appearance_mode'], missing: ['manual'] }, { ...evolveArgs, name: row.name }) }] };
