@@ -75,6 +75,19 @@ try {
         // Write cache
         try { writeFileSync(HUD_CACHE_PATH, JSON.stringify({ ts: Date.now(), lines: hudLines })); } catch { /* non-fatal */ }
       }
+    } else {
+      // Fallback: try omc-hud.mjs if claude-hud plugin not found
+      const omcHudPath = join(homedir(), ".claude", "hud", "omc-hud.mjs");
+      try {
+        const result = execSync(
+          `node "${toUnix(omcHudPath)}"`,
+          { input: stdinData, timeout: 5000, encoding: "utf-8", shell: "bash", stdio: ["pipe", "pipe", "pipe"] }
+        );
+        if (result) {
+          hudLines = result.trimEnd().split("\n");
+          try { writeFileSync(HUD_CACHE_PATH, JSON.stringify({ ts: Date.now(), lines: hudLines })); } catch { /* non-fatal */ }
+        }
+      } catch { /* omc-hud not available */ }
     }
   }
 } catch { /* claude-hud failed */ }
@@ -247,22 +260,39 @@ if (buddyRight.length === 0) {
   // Find the max visible width of HUD lines for padding
   const hudVisibleWidths = hudLines.map((l) => stripAnsi(l).length);
   const maxHudWidth = Math.max(...hudVisibleWidths, 0);
-  // Add a gutter between HUD and buddy
+  const buddyVisibleWidths = buddyRight.map((l) => stripAnsi(l).length);
+  const maxBuddyWidth = Math.max(...buddyVisibleWidths, 0);
   const gutter = 3;
   const padWidth = maxHudWidth + gutter;
+  // When running as subprocess, process.stdout.columns is undefined — always use side-by-side
+  const termCols = process.stdout.columns;
+  const sideBySideWidth = maxHudWidth + gutter + maxBuddyWidth;
+  const useSideBySide = !termCols || sideBySideWidth <= termCols;
 
-  const totalLines = Math.max(hudLines.length, buddyRight.length);
-  for (let i = 0; i < totalLines; i++) {
-    const hudPart = hudLines[i] || "";
-    const buddyPart = buddyRight[i] || "";
+  if (useSideBySide) {
+    // Side-by-side layout
+    const totalLines = Math.max(hudLines.length, buddyRight.length);
+    for (let i = 0; i < totalLines; i++) {
+      const hudPart = hudLines[i] || "";
+      const buddyPart = buddyRight[i] || "";
 
-    if (buddyPart) {
-      // Pad the HUD line to align buddy column
-      const visibleLen = stripAnsi(hudPart).length;
-      const padding = " ".repeat(Math.max(0, padWidth - visibleLen));
-      console.log(`${hudPart}${padding}${buddyPart}`);
-    } else {
-      console.log(hudPart);
+      if (buddyPart) {
+        const visibleLen = stripAnsi(hudPart).length;
+        const padding = " ".repeat(Math.max(0, padWidth - visibleLen));
+        // When hudPart is empty, prefix with RESET to prevent Claude Code from trimming leading spaces
+        const left = hudPart === "" ? `${RESET}${padding}` : `${hudPart}${padding}`;
+        console.log(`${left}${buddyPart}`);
+      } else {
+        console.log(hudPart);
+      }
+    }
+  } else {
+    // Stacked layout — HUD on top, buddy below
+    for (const line of hudLines) {
+      console.log(line);
+    }
+    for (const line of buddyRight) {
+      console.log(line);
     }
   }
 }
