@@ -16,44 +16,97 @@ const PAD_CHAR = "\u2800";
 // the host: PowerShell on Windows, stty on Unix. Result is cached to avoid
 // paying the ~400ms shell spawn on every render.
 const TERM_COLS_CACHE_PATH = join(homedir(), ".claude", "bbddy-term-cols.json");
-const TERM_COLS_CACHE_TTL = 10_000;
+// Short TTL so terminal resizes are reflected within ~1s. PowerShell spawn
+// is ~255ms which fits comfortably inside Claude Code's statusline refresh
+// interval (usually 1–5s).
+const TERM_COLS_CACHE_TTL = 1_000;
 const TERM_COLS_DEFAULT = 120;
 
-function detectTermColsUncached(): number {
+// Ask the host terminal emulator for the actual pane width. Every emulator
+// exposes this differently, so we try a chain in speed+reliability order
+// and stop at the first hit. All results must be > 40 to guard against
+// emulators that hand back nonsense "default" sizes.
+function detectTermColsUncached(): number | null {
   const override = Number(process.env.BBDDY_TERM_COLS);
   if (override > 0) return override;
 
-  try {
-    if (platform() === "win32") {
-      const out = execFileSync(
-        "powershell.exe",
-        ["-NoProfile", "-Command", "$Host.UI.RawUI.WindowSize.Width"],
-        { encoding: "utf-8", timeout: 1500, stdio: ["ignore", "pipe", "pipe"] },
-      ).trim();
+  // tmux: cheapest, reports the live pane width.
+  if (process.env.TMUX) {
+    try {
+      const out = execFileSync("tmux", ["display", "-p", "#{pane_width}"], {
+        encoding: "utf-8", timeout: 500, stdio: ["ignore", "pipe", "pipe"],
+      }).trim();
       const n = Number(out);
       if (n > 40) return n;
-    } else {
+    } catch { /* fall through */ }
+  }
+
+  // WezTerm: has a CLI that returns JSON with per-pane dimensions.
+  if (process.env.WEZTERM_PANE) {
+    try {
+      const exe = process.env.WEZTERM_EXECUTABLE || "wezterm";
+      // wezterm-gui(.exe) is the GUI binary; the CLI is wezterm(.exe).
+      const cli = exe.replace(/wezterm-gui(\.exe)?$/i, "wezterm$1");
+      const out = execFileSync(cli, ["cli", "list", "--format", "json"], {
+        encoding: "utf-8", timeout: 1000, stdio: ["ignore", "pipe", "pipe"],
+      });
+      const panes = JSON.parse(out) as Array<{ pane_id: number; size?: { cols: number } }>;
+      const myId = Number(process.env.WEZTERM_PANE);
+      const mine = panes.find((p) => p.pane_id === myId);
+      if (mine?.size?.cols && mine.size.cols > 40) return mine.size.cols;
+    } catch { /* fall through */ }
+  }
+
+  // kitty: remote control CLI, requires allow_remote_control.
+  if (process.env.KITTY_WINDOW_ID) {
+    try {
+      const out = execFileSync("kitten", ["@", "ls"], {
+        encoding: "utf-8", timeout: 500, stdio: ["ignore", "pipe", "pipe"],
+      });
+      const data = JSON.parse(out) as Array<{ tabs: Array<{ windows: Array<{ id: number; columns?: number }> }> }>;
+      const myId = Number(process.env.KITTY_WINDOW_ID);
+      for (const os of data) {
+        for (const tab of os.tabs || []) {
+          const win = (tab.windows || []).find((w) => w.id === myId);
+          if (win?.columns && win.columns > 40) return win.columns;
+        }
+      }
+    } catch { /* fall through */ }
+  }
+
+  // Unix fallback: try stty against the controlling tty.
+  if (platform() !== "win32") {
+    try {
       const out = execSync("stty size 2>/dev/null < /dev/tty", {
-        encoding: "utf-8", timeout: 1000, shell: "/bin/sh",
+        encoding: "utf-8", timeout: 500, shell: "/bin/sh",
       }).trim();
       const n = Number(out.split(/\s+/)[1]);
       if (n > 40) return n;
-    }
-  } catch { /* fall through */ }
+    } catch { /* fall through */ }
+  }
 
+  // COLUMNS env var — usually set only by interactive shells, rarely
+  // propagated into Claude Code's statusline subprocess.
   const envCols = Number(process.env.COLUMNS);
   if (envCols > 40) return envCols;
-  return TERM_COLS_DEFAULT;
+
+  // Give up: caller should fall back to close-to-HUD layout rather than
+  // pretend to know the width. Returning null signals "unknown".
+  return null;
 }
 
-function detectTermCols(): number {
+// Returns the detected width, or null if no terminal reported one (in
+// which case the caller should keep the buddy close to the HUD rather
+// than right-align blindly).
+function detectTermCols(): number | null {
   const override = Number(process.env.BBDDY_TERM_COLS);
   if (override > 0) return override;
 
   try {
     const cache = JSON.parse(readFileSync(TERM_COLS_CACHE_PATH, "utf-8"));
-    if (Date.now() - cache.ts < TERM_COLS_CACHE_TTL && cache.cols > 0) {
-      return cache.cols;
+    if (Date.now() - cache.ts < TERM_COLS_CACHE_TTL) {
+      if (cache.cols === null) return null;
+      if (cache.cols > 0) return cache.cols;
     }
   } catch { /* no cache or stale */ }
 
@@ -324,24 +377,24 @@ if (buddyRight.length === 0) {
   const gutter = 3;
   const termCols = detectTermCols();
 
-  // Right-align the buddy to the terminal edge while reserving MARGIN columns
-  // on the right for Claude Code's own footer elements like "◐ medium · /effort"
-  // (~18 chars wide). If bbddy lines overflow the terminal width, the terminal
-  // wraps them into the next visual row and clobbers the footer. Keeping a
-  // conservative margin prevents that wrap. Override with BBDDY_TERM_COLS if
-  // the detected width doesn't match Claude Code's actual usable area.
-  // Small safety margin so no line sits exactly on the terminal edge and
-  // accidentally wraps. /effort and the accept-edits indicator live on the
-  // FOOTER row, not the statusline rows, so they're only affected if our
-  // lines wrap into their row. A 3-column cushion is enough for wide-char
-  // safety without leaving visible empty space on the right.
+  // Pick padding. With a known terminal width we right-align the buddy,
+  // leaving MARGIN columns on the right for Claude Code's footer elements.
+  // Without a known width we just hug the HUD so we can't overshoot and
+  // clobber anything. Always keep the buddy at least `gutter` columns past
+  // the HUD so it never backs up over HUD text.
   const MARGIN = Number(process.env.BBDDY_RIGHT_MARGIN) || 3;
-  const rightAlignedPad = termCols - maxBuddyWidth - MARGIN;
-  // Always keep the buddy at least 'gutter' columns to the right of the HUD
-  // so it never backs up over the HUD text.
-  const padWidth = Math.max(maxHudWidth + gutter, rightAlignedPad);
+  let padWidth: number;
+  let effectiveTermCols: number;
+  if (termCols !== null) {
+    const rightAlignedPad = termCols - maxBuddyWidth - MARGIN;
+    padWidth = Math.max(maxHudWidth + gutter, rightAlignedPad);
+    effectiveTermCols = termCols;
+  } else {
+    padWidth = maxHudWidth + gutter;
+    effectiveTermCols = padWidth + maxBuddyWidth;
+  }
   const sideBySideWidth = padWidth + maxBuddyWidth;
-  const useSideBySide = sideBySideWidth <= termCols;
+  const useSideBySide = sideBySideWidth <= effectiveTermCols;
 
   if (useSideBySide) {
     // Side-by-side layout. Pad with Braille Blank so lines 2+ survive
