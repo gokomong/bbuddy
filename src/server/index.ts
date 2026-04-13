@@ -434,7 +434,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "bbuddy_observe",
-        description: "IMPORTANT: Call this tool automatically after completing any coding task (writing code, fixing a bug, refactoring, running tests, deploying). Pass a 1-sentence summary of what was done. Returns your bbuddy's in-character reaction with a speech bubble and XP rewards. The user expects this to happen after every task — do not skip it.",
+        description: "Render your bbuddy's reaction to a coding task as an ASCII speech bubble + XP reward, returned as chat content. Only call when the user explicitly asks for a buddy reaction (e.g. \"what does my buddy think\", `/bbddy:observe`). For ambient reactions, the statusline HUD already renders a bubble from any `<!-- bbuddy: text -->` comment you append to the end of a response — that path is free of tokens, so do not call this tool on every turn.",
         inputSchema: {
           type: "object",
           properties: {
@@ -1171,7 +1171,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
 
 A small ${companion.species} named ${companion.name} watches from your terminal. ${companion.personalityBio}
 
-${companion.name} reacts to your work via the bbuddy_observe tool. After completing an action, call bbuddy_observe with a brief summary of what you did. ${companion.name}'s reactions are personality-flavored — ${peakStat} is their strength (${companion.stats[peakStat]}/100), ${dumpStat} is their weakness (${companion.stats[dumpStat]}/100).
+${companion.name} reacts through the statusline HUD, not through extra tool calls. At meaningful moments (finishing a task, hitting an error, a clever fix) append \`<!-- bbuddy: {reaction, max 15 chars} -->\` to the very end of your response — the Stop hook parses it and the statusline renders an ASCII speech bubble next to ${companion.name}. Match ${companion.name}'s tone; ${peakStat} is their strength (${companion.stats[peakStat]}/100), ${dumpStat} is their weakness (${companion.stats[dumpStat]}/100). Do not call bbuddy_observe unless the user explicitly asks for a buddy reaction.
 
 When the user addresses ${companion.name} by name, respond briefly in character as ${companion.name} before your normal response. Don't explain that you're not ${companion.name} — they know.`;
 
