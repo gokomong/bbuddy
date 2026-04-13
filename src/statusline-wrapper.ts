@@ -141,6 +141,11 @@ function visualWidth(s: string): number {
   for (const ch of s) {
     const cp = ch.codePointAt(0);
     if (cp === undefined) continue;
+    // East Asian Wide ranges: CJK characters and emoji presentation are
+    // definitively 2 cells. Ambiguous ranges (Misc Symbols 0x2600-0x26FF,
+    // Dingbats 0x2700-0x27BF) are intentionally LEFT OUT — most terminals
+    // including WezTerm render those as 1 cell by default, and counting
+    // them as 2 creates a 1-column drift between idle and reaction states.
     if (
       (cp >= 0x1100 && cp <= 0x115F) ||  // Hangul Jamo
       (cp >= 0x2E80 && cp <= 0x9FFF) ||  // CJK
@@ -150,7 +155,7 @@ function visualWidth(s: string): number {
       (cp >= 0xFE30 && cp <= 0xFE4F) ||  // CJK compat forms
       (cp >= 0xFF00 && cp <= 0xFF60) ||  // Fullwidth forms
       (cp >= 0xFFE0 && cp <= 0xFFE6) ||  // Fullwidth signs
-      (cp >= 0x1F300 && cp <= 0x1F64F) || // Emoticons / misc symbols
+      (cp >= 0x1F300 && cp <= 0x1F64F) || // Emoticons / misc symbols (💬 ✨)
       (cp >= 0x1F680 && cp <= 0x1F6FF) || // Transport
       (cp >= 0x1F900 && cp <= 0x1F9FF)    // Supplemental symbols
     ) {
@@ -372,15 +377,40 @@ try {
       const ambientPool = speciesAmbient[lang][buddy.species] || defaultAmbient[lang];
       // Ambient text rotates on a slow bucket so the user reads a full
       // phrase before it changes instead of strobing every refresh.
+      // Hide it only when an actual speech bubble is about to render — a
+      // reaction with just an indicator (working/excited/...) still keeps
+      // the ambient slot filled so line 3's width stays stable and the
+      // right-aligned padding doesn't shift left/right across renders.
       const ambientBucket = Math.floor(Date.now() / 15_000);
       const ambientR = ((ambientBucket * 374761393) >>> 0) % 1000 / 1000;
-      const ambientText = hasReactionActive ? '' : `${DIM}${ambientPool[Math.floor(ambientR * ambientPool.length)]}${RESET}`;
+      const willRenderBubble = Boolean(reactionText);
+      // Reserve a fixed visual slot for ambient text so rotating between
+      // phrases of different lengths doesn't shift the buddy's right-aligned
+      // anchor every 15 seconds.
+      const AMBIENT_SLOT_WIDTH = 24;
+      let ambientText = '';
+      if (!willRenderBubble) {
+        const raw = ambientPool[Math.floor(ambientR * ambientPool.length)] || '';
+        const padRight = ' '.repeat(Math.max(0, AMBIENT_SLOT_WIDTH - visualWidth(raw)));
+        ambientText = `${DIM}${raw}${padRight}${RESET}`;
+      } else {
+        ambientText = ' '.repeat(AMBIENT_SLOT_WIDTH);
+      }
 
       const shinyTag = buddy.is_shiny ? " ✨" : "";
       const rarityColor = buddy.rarity ? (RARITY_ANSI[buddy.rarity as keyof typeof RARITY_ANSI] || DIM) : DIM;
       const stars = buddy.rarity_stars || '';
-      const nameIndicator = reactionIndicator ? `${YELLOW}${reactionIndicator}${RESET}` : '';
-      const nameInfo = `${CYAN}${buddy.name}${nameIndicator}${RESET} ${DIM}(${buddy.species})${RESET} ${YELLOW}Lv.${buddy.level}${shinyTag}${RESET}`;
+      // Reserve a fixed visual width for the reaction indicator so the name
+      // line's total cell count is stable whether the buddy is idle, working
+      // (⚙), excited (!), concerned (...), etc. Without this reservation
+      // the right-aligned layout shifts left/right by 2–3 columns every time
+      // a Bash hook toggles reaction state, which looks like the buddy is
+      // wobbling back and forth.
+      const INDICATOR_WIDTH = 3;
+      const indicatorText = reactionIndicator || '';
+      const indicatorPad = ' '.repeat(Math.max(0, INDICATOR_WIDTH - visualWidth(indicatorText)));
+      const nameIndicator = `${YELLOW}${indicatorText}${indicatorPad}${RESET}`;
+      const nameInfo = `${CYAN}${buddy.name}${RESET}${nameIndicator}${DIM}(${buddy.species})${RESET} ${YELLOW}Lv.${buddy.level}${shinyTag}${RESET}`;
       const moodInfo = `${moodColor(buddy.mood)}${buddy.mood}${RESET} ${DIM}XP:${RESET}${buddy.xp} ${rarityColor}${stars}${RESET}`;
 
       // Build a speech bubble if the buddy has an active reaction text. The
@@ -418,7 +448,7 @@ try {
         let infoSuffix = "";
         if (i === 0) infoSuffix = ` ${nameInfo}`;
         else if (i === 1) infoSuffix = ` ${moodInfo}`;
-        else if (i === 2 && ambientText && !reactionText) infoSuffix = ` ${ambientText}`;
+        else if (i === 2) infoSuffix = ` ${ambientText}`;
 
         if (artLine || bubblePiece) {
           buddyRight.push(`${bubblePiece}${artPart}${infoSuffix}`);
@@ -440,9 +470,13 @@ if (buddyRight.length === 0) {
   }
 } else {
   // Find the max visible width of HUD lines for padding
-  const hudVisibleWidths = hudLines.map((l) => stripAnsi(l).length);
+  const hudVisibleWidths = hudLines.map((l) => visualWidth(stripAnsi(l)));
   const maxHudWidth = Math.max(...hudVisibleWidths, 0);
-  const buddyVisibleWidths = buddyRight.map((l) => stripAnsi(l).length);
+  // Use the CURRENT buddyRight widths. Each layout component (art, name,
+  // mood, ambient) has already been stabilized upstream (fixed-width
+  // indicator slot, fixed-width ambient slot), so the widest rendered
+  // line should be identical whether the buddy is idle, working, etc.
+  const buddyVisibleWidths = buddyRight.map((l) => visualWidth(stripAnsi(l)));
   const maxBuddyWidth = Math.max(...buddyVisibleWidths, 0);
   const gutter = 3;
   const termCols = detectTermCols();
@@ -488,7 +522,7 @@ if (buddyRight.length === 0) {
       const buddyPart = buddyRight[i] || "";
 
       if (buddyPart) {
-        const visibleLen = stripAnsi(hudPart).length;
+        const visibleLen = visualWidth(stripAnsi(hudPart));
         const padding = PAD_CHAR.repeat(Math.max(0, padWidth - visibleLen));
         console.log(`${hudPart}${padding}${buddyPart}`);
       } else {
