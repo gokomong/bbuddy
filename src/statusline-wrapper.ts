@@ -383,18 +383,15 @@ try {
       // right-aligned padding doesn't shift left/right across renders.
       const ambientBucket = Math.floor(Date.now() / 15_000);
       const ambientR = ((ambientBucket * 374761393) >>> 0) % 1000 / 1000;
-      const willRenderBubble = Boolean(reactionText);
-      // Reserve a fixed visual slot for ambient text so rotating between
-      // phrases of different lengths doesn't shift the buddy's right-aligned
-      // anchor every 15 seconds.
+      // Reserve a fixed visual slot for the line-3 text so neither ambient
+      // rotation nor bubble-vs-inline-reaction swaps shift the buddy's
+      // right-aligned anchor.
       const AMBIENT_SLOT_WIDTH = 24;
-      let ambientText = '';
-      if (!willRenderBubble) {
-        const raw = ambientPool[Math.floor(ambientR * ambientPool.length)] || '';
-        const padRight = ' '.repeat(Math.max(0, AMBIENT_SLOT_WIDTH - visualWidth(raw)));
-        ambientText = `${DIM}${raw}${padRight}${RESET}`;
-      } else {
-        ambientText = ' '.repeat(AMBIENT_SLOT_WIDTH);
+      function fillSlot(raw: string): string {
+        const trimmed = raw.slice(0, AMBIENT_SLOT_WIDTH * 2); // safety cap
+        const vw = visualWidth(trimmed);
+        if (vw >= AMBIENT_SLOT_WIDTH) return trimmed;
+        return trimmed + ' '.repeat(AMBIENT_SLOT_WIDTH - vw);
       }
 
       const shinyTag = buddy.is_shiny ? " ✨" : "";
@@ -413,10 +410,30 @@ try {
       const nameInfo = `${CYAN}${buddy.name}${RESET}${nameIndicator}${DIM}(${buddy.species})${RESET} ${YELLOW}Lv.${buddy.level}${shinyTag}${RESET}`;
       const moodInfo = `${moodColor(buddy.mood)}${buddy.mood}${RESET} ${DIM}XP:${RESET}${buddy.xp} ${rarityColor}${stars}${RESET}`;
 
-      // Build a speech bubble if the buddy has an active reaction text. The
-      // bubble sits to the LEFT of the art with a `--` connector pointing at
-      // the buddy's mouth, vertically centered against the art.
-      const bubble = reactionText ? buildSpeechBubble(reactionText) : { lines: [], connectorIdx: -1, width: 0 };
+      // Decide whether there's enough horizontal room for the speech bubble.
+      // The bubble adds ~35 cells to the left of the buddy; in narrow panes
+      // that pushes the anchor around every time a reaction fires or
+      // expires. If we can't fit it, drop the bubble and show the reaction
+      // text inline in the line-3 slot (replacing ambient) instead.
+      const termColsForBubble = detectTermCols();
+      const BUBBLE_TOTAL_RESERVE = 35; // bubble box (32) + connector (3)
+      const bubbleFits =
+        termColsForBubble !== null &&
+        reactionText.length > 0 &&
+        termColsForBubble >= BUBBLE_TOTAL_RESERVE + 20 + 10;
+      const bubble = bubbleFits ? buildSpeechBubble(reactionText) : { lines: [], connectorIdx: -1, width: 0 };
+
+      // Line 3 content: bubble hides it, otherwise show inline reaction or
+      // ambient — always padded to the fixed slot so width stays constant.
+      let line3Raw: string;
+      if (bubbleFits) {
+        line3Raw = '';
+      } else if (reactionText) {
+        line3Raw = `"${reactionText}"`;
+      } else {
+        line3Raw = ambientPool[Math.floor(ambientR * ambientPool.length)] || '';
+      }
+      const ambientText = bubbleFits ? ' '.repeat(AMBIENT_SLOT_WIDTH) : `${DIM}${fillSlot(line3Raw)}${RESET}`;
       const bubbleStart = bubble.lines.length > 0 && bubble.lines.length < asciiLines.length
         ? Math.floor((asciiLines.length - bubble.lines.length) / 2)
         : 0;
