@@ -110,7 +110,7 @@ src/
 ├── db/schema.ts            # Tables + initDb()
 ├── statusline-wrapper.ts   # The statusline renderer (runs every 1s)
 ├── creator/
-│   ├── wizard.ts           # bbuddy_create state machine + prompts
+│   ├── wizard.ts           # state machine + shared `.___.` card shell used by every wizard step AND the preview
 │   ├── parts-combiner.ts   # Mode 2 (face+eye+accessory+body)
 │   ├── manual-input.ts     # Mode 4 (raw ASCII)
 │   ├── presets.ts          # 6 personality presets + bio templates
@@ -119,7 +119,7 @@ src/
 │   ├── index.ts            # getLang/setLang backed by settings table
 │   └── server.ts           # SERVER_STRINGS catalog
 └── lib/
-    ├── species.ts          # 21 built-in species (SPRITE_BODIES)
+    ├── species.ts          # 21 built-in species (SPRITE_BODIES, SPECIES_ANIMATIONS, `getSpeciesPreviewFrame`)
     ├── reactions.ts        # Species-specific reaction templates
     ├── leveling.ts         # XP / level curve
     ├── observer.ts         # bbuddy_observe orchestration
@@ -196,6 +196,23 @@ call `bbuddy_observe` when the user explicitly asks for a reaction.
 - Never auto-call `bbuddy_observe` — only when the user literally
   asks (`/bbuddy:observe`, "what does my buddy think?", etc).
 - Respect muted state (`mood === 'muted'` → no reactions).
+
+### Create wizard
+- The `bbuddy_create` tool **is** the wizard UI. Every step returns
+  a framed `.______.` card built with the shared `drawCard()` /
+  `ln()` helpers in `src/creator/wizard.ts`. The preview card uses
+  the same shell for visual consistency.
+- The `/bbuddy:create` skill markdown must tell the LLM to **relay
+  the tool's output verbatim** inside a fenced block. Never rewrite
+  the skill to make the LLM ask questions in its own voice — that
+  defeats the wizard and was the whole motivation for Phase 6.
+- Mode 1 (species) previews pull ASCII from
+  `getSpeciesPreviewFrame(species)` in `src/lib/species.ts`, which
+  extracts the first adult frame from `SPECIES_ANIMATIONS` and
+  substitutes `{E}`. Modes 2/3/4 still pass `customSprite.idleFrames[0]`.
+- Card width is `48` and `CARD_INNER` is `44`. Any body line longer
+  than `CARD_INNER` is clipped with `…` by `ln()`. Widening the card
+  to fit more content is fine; don't let content leak past `|`.
 
 ### i18n
 - English is the default. Korean is opt-in via `bbuddy_language`.
@@ -290,12 +307,42 @@ Each bullet is one commit:
     LLM stops auto-calling it on every turn — the `<!-- bbuddy: -->`
     comment pipeline is cheaper.
 
+### Phase 6 — tool-driven wizard card (2026-04-15)
+Before this phase the create flow was half-tool, half-conversational
+LLM scripting: `skills/create/SKILL.md` instructed the model to ask
+each step by hand, and the preview card for mode 1 (species) left
+the sprite area blank because the handler only passed a frame for
+modes 2/3/4. This phase moves all of that UI into the tool itself.
+
+1. `feat(species)`: new `getSpeciesPreviewFrame(species, eye)` in
+   `src/lib/species.ts` — pulls the first adult frame out of
+   `SPECIES_ANIMATIONS`, substitutes `{E}`, returns `string[]`.
+2. `feat(creator)`: extracted `CARD_WIDTH=48`, `drawCard()`, `ln()`,
+   `progressDots()` helpers in `src/creator/wizard.ts` and rebuilt
+   `renderWizardPrompt` to emit a framed card for every step. The
+   species step renders a 2-column grid of all 21 species inside
+   the same frame. Every card ends with a `→ param: "..."` hint line
+   so the LLM knows exactly which param to set next.
+3. `feat(creator)`: `renderPreviewText` now shares the same
+   `drawCard()` shell so the wizard and the preview visually match.
+4. `feat(server)`: `bbuddy_create` handler falls back from
+   `customSprite?.idleFrames[0]` to `getSpeciesPreviewFrame()` when
+   `appearance_mode === '1'`, so species previews finally show the
+   ASCII body.
+5. `docs(skill)`: `skills/create/SKILL.md` rewritten to "relay the
+   tool's output verbatim in a fenced block, do not add your own
+   questions". One-sentence follow-up hints allowed; no narration,
+   no bullet-rewriting, no choice lists composed by the LLM.
+6. `test`: 5 new cases for `getSpeciesPreviewFrame`, 5 for
+   `renderWizardPrompt`, 4 for `renderPreviewText`. Test count
+   295 → 309.
+
 ---
 
-## 8. Current state snapshot (2026-04-13)
+## 8. Current state snapshot (2026-04-15)
 
 - **Build**: passes.
-- **Tests**: 295 / 295 (vitest).
+- **Tests**: 309 / 309 (vitest).
 - **Locale**: English default, Korean opt-in.
 - **Statusline**: zero plugin dependencies, renders buddy only.
 - **Reaction pipeline**: `<!-- bbuddy: -->` via Stop hook is the

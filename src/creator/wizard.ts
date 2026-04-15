@@ -204,135 +204,146 @@ export function evaluateWizardState(args: WizardArgs): WizardState {
   return { step: 'ready', completed, missing: [] };
 }
 
-export function renderWizardPrompt(state: WizardState, args: WizardArgs): string {
-  const M = WIZARD_STRINGS[getLang()];
+// Shared card frame. Used by every wizard step and the preview so the
+// flow has one consistent visual shell.
+const CARD_WIDTH = 48;
+const CARD_INNER = CARD_WIDTH - 4;
+const CARD_TOP = '.' + '_'.repeat(CARD_WIDTH - 2) + '.';
+const CARD_BOT = "'" + '_'.repeat(CARD_WIDTH - 2) + "'";
+
+function ln(text: string = ''): string {
+  const clipped = text.length > CARD_INNER
+    ? text.slice(0, CARD_INNER - 1) + '…'
+    : text;
+  return '| ' + clipped.padEnd(CARD_INNER) + ' |';
+}
+
+function drawCard(body: string[]): string {
+  return [CARD_TOP, ...body.map(l => ln(l)), CARD_BOT].join('\n');
+}
+
+function progressDots(state: WizardState): string {
   const STEPS = ['name', 'appearance', 'personality', 'stats'];
-  const progress = STEPS.map(s => {
+  return STEPS.map(s => {
     const done = state.completed.includes(s);
     const cur  = (s === 'appearance' && ['appearance_mode','species','parts','ai_prompt','manual'].includes(state.step))
                || state.step === s;
     return done ? '●' : cur ? '◉' : '○';
-  }).join('');
+  }).join(' ');
+}
 
-  const lines: string[] = [
-    `╔══════════════════════════════╗`,
-    `║   ${M.title.padEnd(26)} ║`,
-    `╚══════════════════════════════╝`,
-    ``,
-    `  ${progress}`,
-    ``,
-  ];
+export function renderWizardPrompt(state: WizardState, args: WizardArgs): string {
+  const M = WIZARD_STRINGS[getLang()];
+  const body: string[] = [];
+  const pushHeader = (title: string) => {
+    body.push(title);
+    body.push('');
+    body.push(`  ${progressDots(state)}`);
+    body.push('');
+    if (args.name) {
+      body.push(`  ${M.name}: ${args.name}`);
+      body.push('');
+    }
+  };
 
   if (state.step === 'name') {
-    lines.push(`  ${M.stepName}`);
-    lines.push(`  ──────────────────────────────`);
-    lines.push(`  ${M.namePrompt}`);
-    lines.push(`  ${M.nameExample}`);
+    pushHeader(M.stepName);
+    body.push(`  ${M.namePrompt}`);
+    body.push(`  ${M.nameExample}`);
+    body.push('');
+    body.push(`  → bbuddy_create({ name: "..." })`);
 
   } else if (state.step === 'appearance_mode') {
-    lines.push(`  ${M.stepAppearance}`);
-    lines.push(`  ──────────────────────────────`);
-    lines.push(`  ${M.name}: ${args.name}`);
-    lines.push(``);
-    lines.push(`  ${M.chooseAppearanceMode}`);
-    lines.push(``);
-    lines.push(`  ${M.mode1Label}`);
-    lines.push(`  ${M.mode2Label}`);
-    lines.push(`  ${M.mode3Label}`);
-    lines.push(`  ${M.mode4Label}`);
+    pushHeader(M.stepAppearance);
+    body.push(`  ${M.chooseAppearanceMode}`);
+    body.push('');
+    body.push(`  ${M.mode1Label}`);
+    body.push(`  ${M.mode2Label}`);
+    body.push(`  ${M.mode3Label}`);
+    body.push(`  ${M.mode4Label}`);
+    body.push('');
+    body.push(`  → appearance_mode: "1" | "2" | "3" | "4"`);
 
   } else if (state.step === 'species') {
-    lines.push(`  ${M.mode1Title}`);
-    lines.push(`  ──────────────────────────────`);
-    lines.push(`  ${M.name}: ${args.name}`);
-    lines.push(``);
-    lines.push(`  ${M.mode1Prompt}`);
-    lines.push(``);
-    const cols = 3;
-    for (let i = 0; i < SPECIES_LIST.length; i += cols) {
-      const row = [...SPECIES_LIST.slice(i, i + cols)];
-      lines.push(`  ${row.map(s => s.padEnd(16)).join('')}`);
+    pushHeader(M.mode1Title);
+    body.push(`  ${M.mode1Prompt}`);
+    body.push('');
+    const colWidth = 22;
+    for (let i = 0; i < SPECIES_LIST.length; i += 2) {
+      const row = SPECIES_LIST.slice(i, i + 2).map(s => s.padEnd(colWidth)).join('');
+      body.push(row);
     }
+    body.push('');
+    body.push(`  → species: "..."`);
 
   } else if (state.step === 'parts') {
     const p = args.parts ?? {};
-    lines.push(`  ${M.mode2Title}`);
-    lines.push(`  ──────────────────────────────`);
-    lines.push(`  ${M.name}: ${args.name}`);
-    lines.push(``);
-    lines.push(`  ${M.mode2Prompt}`);
-    lines.push(``);
-    lines.push(`  ${M.mode2Face}`);
-    lines.push(`  ${M.mode2Eye}`);
-    lines.push(`  ${M.mode2Accessory}`);
-    lines.push(`  ${M.mode2Body}`);
-    lines.push(``);
-    lines.push(`  ${M.mode2Current}`);
-    lines.push(`    face: ${p.face ?? M.unset}  eye: ${p.eye ?? M.unset}`);
-    lines.push(`    accessory: ${p.accessory ?? M.unset}  body: ${p.body ?? M.unset}`);
+    pushHeader(M.mode2Title);
+    body.push(`  ${M.mode2Prompt}`);
+    body.push('');
+    body.push(`  ${M.mode2Face}`);
+    body.push(`  ${M.mode2Eye}`);
+    body.push(`  ${M.mode2Accessory}`);
+    body.push(`  ${M.mode2Body}`);
+    body.push('');
+    body.push(`  ${M.mode2Current}`);
+    body.push(`    face: ${p.face ?? M.unset}  eye: ${p.eye ?? M.unset}`);
+    body.push(`    accessory: ${p.accessory ?? M.unset}`);
+    body.push(`    body: ${p.body ?? M.unset}`);
 
   } else if (state.step === 'ai_prompt') {
-    lines.push(`  ${M.mode3Title}`);
-    lines.push(`  ──────────────────────────────`);
-    lines.push(`  ${M.name}: ${args.name}`);
-    lines.push(``);
-    lines.push(`  ${M.mode3Prompt}`);
-    lines.push(``);
-    lines.push(`  ${M.mode3Examples}`);
-    lines.push(`    ${M.mode3Ex1}`);
-    lines.push(`    ${M.mode3Ex2}`);
-    lines.push(`    ${M.mode3Ex3}`);
-    lines.push(``);
-    lines.push(`  ${M.mode3Note}`);
+    pushHeader(M.mode3Title);
+    body.push(`  ${M.mode3Prompt}`);
+    body.push('');
+    body.push(`  ${M.mode3Examples}`);
+    body.push(`    ${M.mode3Ex1}`);
+    body.push(`    ${M.mode3Ex2}`);
+    body.push(`    ${M.mode3Ex3}`);
+    body.push('');
+    body.push(`  ${M.mode3Note}`);
 
   } else if (state.step === 'manual') {
-    lines.push(`  ${M.mode4Title}`);
-    lines.push(`  ──────────────────────────────`);
-    lines.push(`  ${M.name}: ${args.name}`);
-    lines.push(``);
-    lines.push(`  ${M.mode4Prompt}`);
-    lines.push(`  ${M.mode4Limit}`);
-    lines.push(``);
-    lines.push(`  ${M.mode3Examples}`);
-    lines.push(`    ${M.mode4Ex1}`);
-    lines.push(``);
-    lines.push(`  ${M.mode4Note}`);
+    pushHeader(M.mode4Title);
+    body.push(`  ${M.mode4Prompt}`);
+    body.push(`  ${M.mode4Limit}`);
+    body.push('');
+    body.push(`  ${M.mode3Examples}`);
+    body.push(`    ${M.mode4Ex1}`);
+    body.push('');
+    body.push(`  ${M.mode4Note}`);
 
   } else if (state.step === 'personality') {
-    lines.push(`  ${M.personalityTitle}`);
-    lines.push(`  ──────────────────────────────`);
-    lines.push(`  ${M.name}: ${args.name}`);
-    lines.push(``);
-    lines.push(`  ${M.personalityPrompt}`);
-    lines.push(``);
+    pushHeader(M.personalityTitle);
+    body.push(`  ${M.personalityPrompt}`);
+    body.push('');
     for (const [, def] of Object.entries(PRESETS)) {
-      lines.push(`  ${def.id.padEnd(12)} ${def.label.padEnd(8)} ${def.description}`);
+      body.push(`  ${def.id.padEnd(11)} ${def.label}`);
+      body.push(`    ${def.description}`);
     }
-    lines.push(``);
-    lines.push(`  ${M.personalityCustom}`);
+    body.push('');
+    body.push(`  ${M.personalityCustom}`);
+    body.push('');
+    body.push(`  → personality_preset: "..."`);
 
   } else if (state.step === 'stats') {
+    pushHeader(M.statsTitle(STAT_POOL));
     const statsErr = args.stats ? validateStatDistribution(args.stats) : null;
-    lines.push(`  ${M.statsTitle(STAT_POOL)}`);
-    lines.push(`  ──────────────────────────────`);
-    lines.push(`  ${M.name}: ${args.name}`);
-    lines.push(``);
-    lines.push(`  ${M.statsPrompt}`);
-    lines.push(`  ${M.statsLimit(STAT_MIN, STAT_MAX)}`);
-    lines.push(``);
+    body.push(`  ${M.statsPrompt}`);
+    body.push(`  ${M.statsLimit(STAT_MIN, STAT_MAX)}`);
+    body.push('');
     for (const stat of STAT_NAMES) {
       const cur = args.stats?.[stat];
-      lines.push(`  ${stat.padEnd(12)} ${cur !== undefined ? String(cur) : M.unset}`);
+      body.push(`  ${stat.padEnd(12)} ${cur !== undefined ? String(cur) : M.unset}`);
     }
     if (statsErr && !statsErr.valid) {
-      lines.push(``);
-      lines.push(`  ⚠ ${statsErr.error}`);
+      body.push('');
+      body.push(`  ⚠ ${statsErr.error}`);
     }
-    lines.push(``);
-    lines.push(`  ${M.statsExample}`);
+    body.push('');
+    body.push(`  ${M.statsExample}`);
   }
 
-  return lines.join('\n');
+  return drawCard(body);
 }
 
 export function renderPreviewText(
@@ -343,48 +354,43 @@ export function renderPreviewText(
   stats: Record<string, number>,
   customFramePreview?: string[],
 ): string {
-  const cardWidth = 44;
-  const inner = cardWidth - 4;
-  const top = '.' + '_'.repeat(cardWidth - 2) + '.';
-  const bot = "'" + '_'.repeat(cardWidth - 2) + "'";
-  const ln  = (text: string) => '| ' + text.padEnd(inner) + ' |';
-  const empty = '| ' + ' '.repeat(inner) + ' |';
+  const bioWidth = CARD_INNER - 4;
 
   const statLines = STAT_NAMES.map(s => {
     const val = Math.round(stats[s] ?? 0);
     const filled = Math.floor((val / 100) * 8);
     const bar = '█'.repeat(filled) + '░'.repeat(8 - filled);
-    return ln(`${s.padEnd(10)} ${bar}   ${String(val).padStart(2)}`);
+    return `  ${s.padEnd(10)} ${bar}   ${String(val).padStart(2)}`;
   });
 
   const bioWords = bio.split(' ');
   const bioLines: string[] = [];
   let cur = '';
   for (const w of bioWords) {
-    if (cur.length + w.length + 1 > inner - 2 && cur) {
-      bioLines.push(ln(' ' + cur));
+    if (cur.length + w.length + 1 > bioWidth && cur) {
+      bioLines.push(`   ${cur}`);
       cur = w;
     } else {
       cur = cur ? `${cur} ${w}` : w;
     }
   }
-  if (cur) bioLines.push(ln(' ' + cur));
+  if (cur) bioLines.push(`   ${cur}`);
 
   const spriteLines = customFramePreview
-    ? customFramePreview.map(l => ln('  ' + l))
+    ? customFramePreview.map(l => `  ${l}`)
     : [];
 
-  return [
-    top,
-    ln(`★★ CUSTOM   ${species.toUpperCase()}`),
-    empty,
-    ...(spriteLines.length > 0 ? [...spriteLines, empty] : []),
-    ln(`  ${name}  [★★ CUSTOM]`),
-    ln(`  ${presetLabel}`),
-    empty,
+  const body = [
+    `★★ CUSTOM   ${species.toUpperCase()}`,
+    '',
+    ...(spriteLines.length > 0 ? [...spriteLines, ''] : []),
+    `  ${name}  [★★ CUSTOM]`,
+    `  ${presetLabel}`,
+    '',
     ...bioLines,
-    empty,
+    '',
     ...statLines,
-    bot,
-  ].join('\n');
+  ];
+
+  return drawCard(body);
 }

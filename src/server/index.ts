@@ -10,7 +10,7 @@ import { initDb, db } from "../db/schema.js";
 import {
   SPECIES, SPECIES_LIST,
   generateName, calculateMood, getReaction,
-  renderSprite,
+  renderSprite, getSpeciesPreviewFrame,
 } from "../lib/species.js";
 import { type Companion, STAT_NAMES, RARITY_STARS, RARITY_ANSI, SPARKLE_EYE, PERSONALITY_PRESETS, getPeakStat, getDumpStat } from "../lib/types.js";
 import { roll, statBar } from "../lib/rng.js";
@@ -856,7 +856,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     // Show preview if not confirmed
     if (!wizardArgs.confirm) {
-      const preview = renderPreviewText(wizardArgs.name!, speciesForDb, presetLabel, bio, stats, customSprite?.idleFrames[0]);
+      const previewFrame = customSprite?.idleFrames[0]
+        ?? (mode === '1' ? getSpeciesPreviewFrame(speciesForDb) : undefined);
+      const preview = renderPreviewText(wizardArgs.name!, speciesForDb, presetLabel, bio, stats, previewFrame);
       return {
         content: [{
           type: "text",

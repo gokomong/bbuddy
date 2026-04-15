@@ -600,3 +600,9 @@ export function renderFace(bones: CompanionBones): string {
 export function spriteFrameCount(species: string): number {
   return SPRITE_BODIES[species]?.length ?? 1;
 }
+
+export function getSpeciesPreviewFrame(species: string, eye: string = '·'): string[] | undefined {
+  const frames = SPECIES_ANIMATIONS[species]?.adult;
+  if (!frames || frames.length === 0) return undefined;
+  return frames[0].replaceAll('{E}', eye).split('\n');
+}

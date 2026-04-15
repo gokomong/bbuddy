@@ -5,6 +5,7 @@ import {
   renderSprite,
   renderFace,
   spriteFrameCount,
+  getSpeciesPreviewFrame,
 } from '../lib/species.js';
 import { generateBio } from '../lib/personality.js';
 import type { CompanionBones, Eye, Hat, StatName } from '../lib/types.js';
@@ -212,5 +213,44 @@ describe('generateBio', () => {
     const bio = generateBio(bones);
     // SNARK weakness = 'roasting your code when it should be helping'
     expect(bio).toContain('roasting your code when it should be helping');
+  });
+});
+
+// ── 5. Species Preview Frame (create wizard) ─────────────────────────────────
+
+describe('getSpeciesPreviewFrame', () => {
+  it('returns an array of lines for a valid species', () => {
+    const frame = getSpeciesPreviewFrame('Owl');
+    expect(frame).toBeDefined();
+    expect(Array.isArray(frame)).toBe(true);
+    expect(frame!.length).toBeGreaterThan(0);
+  });
+
+  it('substitutes {E} with the default eye', () => {
+    const frame = getSpeciesPreviewFrame('Void Cat');
+    expect(frame).toBeDefined();
+    const joined = frame!.join('\n');
+    expect(joined).not.toContain('{E}');
+    expect(joined).toContain('·');
+  });
+
+  it('respects a custom eye character', () => {
+    const frame = getSpeciesPreviewFrame('Void Cat', '@');
+    const joined = frame!.join('\n');
+    expect(joined).toContain('@');
+    expect(joined).not.toContain('·');
+  });
+
+  it('returns undefined for an unknown species', () => {
+    expect(getSpeciesPreviewFrame('Not A Real Species')).toBeUndefined();
+  });
+
+  it('returns a frame for every species with animation data', () => {
+    for (const species of SPECIES_LIST) {
+      const frame = getSpeciesPreviewFrame(species);
+      if (frame) {
+        expect(frame.every(l => !l.includes('{E}'))).toBe(true);
+      }
+    }
   });
 });

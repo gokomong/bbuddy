@@ -2,7 +2,8 @@
 import { describe, it, expect } from 'vitest';
 import { validateStatDistribution, normaliseStats, STAT_POOL } from '../creator/stats.js';
 import { generatePresetBio, PRESETS } from '../creator/presets.js';
-import { evaluateWizardState } from '../creator/wizard.js';
+import { evaluateWizardState, renderWizardPrompt, renderPreviewText } from '../creator/wizard.js';
+import { getSpeciesPreviewFrame } from '../lib/species.js';
 import { STAT_NAMES } from '../lib/types.js';
 
 // --- validateStatDistribution ---
@@ -167,5 +168,89 @@ describe('evaluateWizardState', () => {
   it('rejects invalid species', () => {
     const state = evaluateWizardState({ name: 'Mochi', appearance_mode: '1', species: 'FakeSpecies' });
     expect(state.step).toBe('species');
+  });
+});
+
+// --- renderWizardPrompt (framed card shell) ---
+
+describe('renderWizardPrompt', () => {
+  it('wraps output in a `.______.` top and `\'______\'` bottom frame', () => {
+    const state = evaluateWizardState({});
+    const card = renderWizardPrompt(state, {});
+    const lines = card.split('\n');
+    expect(lines[0]).toMatch(/^\._+\.$/);
+    expect(lines[lines.length - 1]).toMatch(/^'_+'$/);
+  });
+
+  it('every body line is framed with `|` borders of equal width', () => {
+    const state = evaluateWizardState({ name: 'Mochi' });
+    const card = renderWizardPrompt(state, { name: 'Mochi' });
+    const lines = card.split('\n');
+    const width = lines[0].length;
+    for (const line of lines) {
+      expect(line.length).toBe(width);
+    }
+    for (const line of lines.slice(1, -1)) {
+      expect(line.startsWith('| ')).toBe(true);
+      expect(line.endsWith(' |')).toBe(true);
+    }
+  });
+
+  it('shows the species grid when on the species step', () => {
+    const state = evaluateWizardState({ name: 'Mochi', appearance_mode: '1' });
+    const card = renderWizardPrompt(state, { name: 'Mochi', appearance_mode: '1' });
+    expect(card).toContain('Void Cat');
+    expect(card).toContain('Owl');
+    expect(card).toContain('Chonk');
+  });
+
+  it('shows the name once accumulated', () => {
+    const state = evaluateWizardState({ name: 'Mochi', appearance_mode: '1' });
+    const card = renderWizardPrompt(state, { name: 'Mochi', appearance_mode: '1' });
+    expect(card).toContain('Mochi');
+  });
+
+  it('includes progress indicator dots', () => {
+    const state = evaluateWizardState({ name: 'Mochi' });
+    const card = renderWizardPrompt(state, { name: 'Mochi' });
+    expect(card).toMatch(/[●◉○]/);
+  });
+});
+
+// --- renderPreviewText (preview card with sprite) ---
+
+describe('renderPreviewText', () => {
+  const stats = { DEBUGGING: 22, PATIENCE: 24, CHAOS: 14, WISDOM: 28, SNARK: 12 };
+
+  it('renders a framed preview card', () => {
+    const card = renderPreviewText('Mochi', 'Owl', 'Sage', 'Wise owl.', stats);
+    const lines = card.split('\n');
+    expect(lines[0]).toMatch(/^\._+\.$/);
+    expect(lines[lines.length - 1]).toMatch(/^'_+'$/);
+  });
+
+  it('includes stat bars for every stat', () => {
+    const card = renderPreviewText('Mochi', 'Owl', 'Sage', 'Wise owl.', stats);
+    for (const name of STAT_NAMES) {
+      expect(card).toContain(name);
+    }
+  });
+
+  it('embeds sprite lines when a species frame is passed', () => {
+    const frame = getSpeciesPreviewFrame('Owl');
+    expect(frame).toBeDefined();
+    const card = renderPreviewText('Mochi', 'Owl', 'Sage', 'Wise owl.', stats, frame);
+    for (const line of frame!) {
+      const trimmed = line.trim();
+      if (trimmed) expect(card).toContain(trimmed);
+    }
+  });
+
+  it('omits sprite section when no frame is provided', () => {
+    const frame = getSpeciesPreviewFrame('Owl')!;
+    const withFrame = renderPreviewText('Mochi', 'Owl', 'Sage', 'Wise.', stats, frame);
+    const withoutFrame = renderPreviewText('Mochi', 'Owl', 'Sage', 'Wise.', stats);
+    // The with-frame card has more lines (sprite + separator)
+    expect(withFrame.split('\n').length).toBeGreaterThan(withoutFrame.split('\n').length);
   });
 });

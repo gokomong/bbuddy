@@ -14,9 +14,10 @@ bottom so you can scroll back when a commit message references
 ## 📍 Current position
 
 - **Branch**: `master`
-- **Head**: `4e0494a` (`docs: add AGENTS.md and CLAUDE.md`)
+- **Head**: `4e0494a` (`docs: add AGENTS.md and CLAUDE.md`) + uncommitted
+  wizard-card work (see Session 6 below)
 - **Build**: ✅ passes (`npm run build`)
-- **Tests**: ✅ 295 / 295 (`npm test`)
+- **Tests**: ✅ 309 / 309 (`npm test`)
 - **Deployed locally**: `~/.bbuddy/server/dist/` + `~/.bbuddy/hooks/`
 - **Package name**: `bbuddy@0.1.0`
 - **Language default**: `en` (Korean opt-in via `/bbuddy:language ko`)
@@ -67,9 +68,16 @@ peak/dump stat names.
   from a hook. Documented in AGENTS.md §6. Linux / macOS / WSL are
   fine.
 
-### Phase 5 — stabilization (current session, 2026-04-12 → 2026-04-13)
+### Phase 5 — stabilization (2026-04-12 → 2026-04-13)
 This is where most of the mess happened. The session started with a
 bug-hunt and turned into a half-rewrite. Timeline below.
+
+### Phase 6 — tool-driven wizard card (2026-04-15)
+The create flow was half tool, half LLM-scripted conversation: the
+skill markdown told the LLM to ask the four questions itself, and
+the tool's preview card didn't render any ASCII in species mode.
+This phase makes `bbuddy_create` the single source of truth for the
+UI. See Session 6 below.
 
 ---
 
@@ -153,6 +161,40 @@ constraints kept fighting each other:
 
 ---
 
+## 🧭 Session 6 work log (2026-04-15)
+
+Tool-driven wizard card redesign. The `/bbuddy:create` experience
+was inconsistent: the skill markdown said "guide the user through
+these steps" so the LLM would ask questions in its own voice, and
+the preview card only showed ASCII for parts/AI/manual modes —
+species mode left the sprite area blank. Users saw a plain-text
+conversation instead of a polished wizard.
+
+| What | Why |
+|---|---|
+| `feat(species)` — `getSpeciesPreviewFrame(species, eye)` helper in `src/lib/species.ts` | Needed a one-liner the server handler could call to get the first adult frame of a species with `{E}` already substituted, as a `string[]`. Falls through to `undefined` for unknown species so the preview renderer can skip the sprite section cleanly. |
+| `feat(creator)` — shared card shell in `wizard.ts` | Extracted `CARD_WIDTH=48`, `drawCard()`, `ln()` helpers and rebuilt `renderWizardPrompt` to use them. Every step — name, appearance_mode, species grid, parts, ai_prompt, manual, personality, stats — now renders inside the same `.______.` frame that `renderPreviewText` uses. Progress dots (`● ◉ ○ ○`) on a dedicated row, accumulated state below, choices in the body, and a `→ param: "..."` hint line at the bottom so the LLM knows exactly which field to set on the next call. Species list is a 2-column grid (22 chars wide) so all 21 fit without wrapping past the frame. |
+| `feat(creator)` — species frame in mode-1 preview | `src/server/index.ts` `bbuddy_create` handler now falls back from `customSprite?.idleFrames[0]` to `getSpeciesPreviewFrame(speciesForDb)` when `appearance_mode === '1'`. Mode 2/3/4 keep the custom sprite path unchanged. |
+| `docs(skill)` — rewrite `skills/create/SKILL.md` | Old version had a "흐름" section listing the four steps and told the LLM to ask them conversationally. New version: "the MCP tool IS the wizard — call it immediately, relay the output verbatim in a fenced block, do not add your own questions or choice lists, only add a 1-sentence follow-up hint". Explicit rule for mode 3 (AI delegation): draw the 3 frames, then re-call with `appearance_mode: "4"`. Parameter reference at the bottom as a single code block. |
+| `test(creator)` — renderer + frame tests | `src/__tests__/species.test.ts` gets 5 cases for `getSpeciesPreviewFrame` (valid species, default eye substitution, custom eye, unknown species, no `{E}` leakage). `src/__tests__/creator.test.ts` gets 5 cases for `renderWizardPrompt` (frame borders, equal width, species grid, accumulated name, progress dots) and 4 cases for `renderPreviewText` (frame, stat bars, sprite embedding when frame is passed, sprite omission when not). Total test count goes 295 → 309. |
+| `chore` — build + deploy | `npm run build` → `cp -r dist/* ~/.bbuddy/server/dist/` → `cp skills/create/SKILL.md ~/.claude/plugins/cache/local/bbddy/0.1.0/skills/create/SKILL.md`. Server side needs a Claude Code restart to reload the MCP child; skill MD is re-read on next slash-command invocation. |
+
+**Not yet committed.** Working tree has the wizard, server handler,
+skill markdown, and test files modified. Commit the lot as one
+unit (`feat(creator): tool-driven wizard card`) so reviewers can
+see the intended-vs-implemented loop in one diff.
+
+**During this session we also noticed** that `~/.bbddy/bbddy.db`
+(the legacy pre-rename location) still existed on this machine with
+the user's active companion inside it, while `~/.bbuddy/bbuddy.db`
+was empty. The statusline wrapper was silently reading from one
+path and the MCP server from the other. Fixed in-place by attaching
+legacy and copying `companions`, `xp_events`, `custom_sprites`
+rows into the new DB via SQL `ATTACH`. This is a one-off personal
+data patch — **not** a migration in code. See Known gotchas.
+
+---
+
 ## 💡 Decisions worth remembering
 
 These came up enough that a future contributor could easily reverse
@@ -190,6 +232,7 @@ them by accident:
 | `hooks/codex-*.mjs` intentionally silent | `hooks/codex-session-start.mjs`, `hooks/codex-stop.mjs` | Don't "fix" them by adding console.log — that re-triggers the Codex hook pipe bug. |
 | `run-codex-bbuddy.ps1` still contains a `bbddy-status` string | local helper | Codex CLI's own rename is in progress upstream. Leave the string for now, sync when Codex releases the matching update. |
 | The `Plugin` folder has old `.claude/commands/bbddy-*.md` files | `.claude/commands/` | That directory is per-user Claude Code state and is `.gitignore`d. The canonical slash commands live in `skills/`. |
+| Pre-rename installs leave `~/.bbddy/bbddy.db` behind | upgrade from a pre-`66c7642` layout | No code migration. A user who created a companion before the rename still has their data at the old path while the new MCP reads `~/.bbuddy/bbuddy.db`. Manual fix: `ATTACH` the old DB and copy `companions` / `xp_events` / `custom_sprites` rows into the new one (schemas match). If distributing, document this in install notes. |
 
 ---
 
