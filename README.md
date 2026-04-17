@@ -537,15 +537,10 @@ bbuddy/
 │   ├── codex-session-start.mjs   # Codex: 영문 컨텍스트 주입
 │   └── codex-stop.mjs            # Codex: stdout 스프라이트 렌더링
 │
-├── skills/                       # ← bbuddy 신규
-│   ├── create/SKILL.md
-│   ├── show/SKILL.md
-│   ├── pet/SKILL.md
-│   ├── stats/SKILL.md
-│   ├── rename/SKILL.md
-│   ├── evolve/SKILL.md
-│   ├── off/SKILL.md
-│   └── on/SKILL.md
+├── skills/                       # ← bbuddy 신규 (18 slash commands)
+│   ├── create/ show/ pet/ stats/ rename/ evolve/
+│   ├── off/ on/ hatch/ respawn/ observe/ remember/ dream/
+│   └── save/ list/ summon/ dismiss/ language/
 │
 ├── .claude-plugin/plugin.json    # Claude Code 플러그인 매니페스트
 ├── .codex-plugin/plugin.json     # Codex 플러그인 매니페스트
@@ -565,9 +560,36 @@ bbuddy/
 ## 테스트
 
 ```bash
-npm test          # 294개 테스트 실행
+npm test          # 315개 테스트 실행
 npm run build     # TypeScript 컴파일
 ```
+
+---
+
+## Credits
+
+Forked from [**fiorastudio/buddy**](https://github.com/fiorastudio/buddy) —
+the original MCP companion project (18 species, MCP server scaffolding,
+statusline renderer, XP / dream / evolution systems). bbuddy is a
+fork, not a rewrite; the base hatching/status/presence logic is
+unchanged.
+
+What bbuddy adds on top:
+- **Creator system** — 4-mode wizard (species / parts / AI delegate /
+  manual ASCII), 6 personality presets, 100-pt stat distribution,
+  `custom_sprites` table
+- **Slots** — `bbuddy_save / list / summon / dismiss`, automatic
+  `__previous` backup on swap
+- **i18n** — English default with Korean opt-in (`bbuddy_language`)
+- **Tool-driven creation wizard** — framed `.______.` card rendered
+  by the MCP tool itself (no LLM-scripted conversation)
+- **Statusline hardening** — stable anchor across reaction state,
+  terminal-width auto-detect (tmux / WezTerm / kitty / stty), CJK
+  visual-width math, zero HUD-plugin dependencies
+- **Codex CLI extension** — Codex-specific hooks with ANSI sprite
+  rendering via stdout
+
+Licensed MIT — compatible with upstream. See [LICENSE](./LICENSE).
 
 ---
 
