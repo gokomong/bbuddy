@@ -6,46 +6,52 @@ aims at [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Added
-- Legacy path migration from `~/.bbddy/bbddy.db` and `~/.buddy/buddy.db`
-  to `~/.bbuddy/bbuddy.db`, plus `~/.claude/bbddy-status.json` →
-  `bbuddy-status.json`. Runs on MCP server init and inside the
-  SessionStart hook.
-- `.claude-plugin/.mcp.json` and `.codex-plugin/.mcp.json` with
-  `${CLAUDE_PLUGIN_ROOT}` / `${CODEX_PLUGIN_ROOT}` so marketplace
-  installs can wire the MCP server without running `install.sh`.
-- `keywords`, `author`, `homepage`, `repository`, `bugs`, and
-  `engines` fields in `package.json` for npm discovery.
-- GitHub Actions test matrix (Node 18 / 20 / 22) on push and PR.
-- Issue templates (bug, feature) and PR template.
-- English SKILL.md for every slash command (`pet`, `show`, `stats`,
-  `evolve`, `rename`, `off`, `on`, `save`, `list`, `summon`,
-  `dismiss`) plus new skill docs for `hatch`, `respawn`, `observe`,
-  `remember`, `dream` which previously had MCP tools but no skill.
-- 6 new migration tests (`src/__tests__/migration.test.ts`).
+_Nothing yet._
 
-### Fixed
-- `npm audit` clean: resolved HIGH (`basic-ftp`) and MODERATE (`hono`)
-  transitive vulnerabilities via `puppeteer` update.
-- README install section no longer points at the non-existent
-  `statusLineCmd` settings.json field; now documents the
-  `CLAUDE_CODE_STATUSLINE_CMD` env-var approach used by install.sh.
+## [0.1.0] - 2026-04-17
 
-### Changed
-- MCP tool reference in README updated to include Phase 5 tools
-  (`bbuddy_save`, `bbuddy_list`, `bbuddy_summon`, `bbuddy_dismiss`,
-  `bbuddy_language`) and Phase 5 slash commands.
-- `STATUS.md` and `TODO.md` rewritten for bbuddy; the upstream Alpha
-  P1-1..P1-8 / Nuzzlecap checklist is gone. TODO now points at
-  `AGENTS.md §9` as the single source of pending work.
+First tagged release. Six phases of fork work plus the public-
+readiness sprint (migration safety, marketplace plugin manifests,
+npm metadata, CI, CHANGELOG/CONTRIBUTING/CODE_OF_CONDUCT/SECURITY,
+skill translation, coverage tooling, Bun support) all land under
+this tag.
 
-## [0.1.0] - 2026-04-15 (pre-public)
+### Public-readiness sprint (2026-04-17)
 
-Initial public-readiness release. Six phases of fork work landed on
-`master`; the changelog below condenses AGENTS.md §7 into release
-categories.
+- **Added** — legacy path migration from `~/.bbddy/bbddy.db` and
+  `~/.buddy/buddy.db` → `~/.bbuddy/bbuddy.db`, plus
+  `~/.claude/bbddy-status.json` → `bbuddy-status.json`. Runs on MCP
+  server init and inside the SessionStart hook. 6 new migration tests.
+- **Added** — `.claude-plugin/.mcp.json` and `.codex-plugin/.mcp.json`
+  with `${CLAUDE_PLUGIN_ROOT}` / `${CODEX_PLUGIN_ROOT}` so
+  marketplace installs wire the MCP server without `install.sh`.
+- **Added** — full `package.json` metadata (`keywords`, `author`,
+  `homepage`, `repository`, `bugs`, `engines` for Node ≥18 and Bun
+  ≥1.0.0).
+- **Added** — GitHub Actions test matrix (Node 18 / 20 / 22), issue
+  templates, PR template, coverage tooling
+  (`@vitest/coverage-v8` + `npm run test:coverage`).
+- **Added** — English SKILL.md for every slash command plus new skill
+  docs for `hatch`, `respawn`, `observe`, `remember`, `dream`.
+- **Added** — `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`,
+  `CHANGELOG.md`, README Credits section, README status badges,
+  HANDOFF maintainer-diary banner.
+- **Added** — `install.sh` / `install.ps1` detect Bun and prefer it,
+  falling back to npm if native rebuild fails.
+- **Fixed** — `npm audit` clean: resolved HIGH (`basic-ftp`) and
+  MODERATE (`hono`) transitive vulnerabilities.
+- **Fixed** — README install section no longer points at the
+  non-existent `statusLineCmd` settings.json field; now documents
+  the `CLAUDE_CODE_STATUSLINE_CMD` env-var approach.
+- **Changed** — MCP tool reference in README updated with Phase 5
+  tools (`bbuddy_save / list / summon / dismiss / language`) and
+  matching slash commands.
+- **Changed** — `STATUS.md` and `TODO.md` rewritten for bbuddy; the
+  upstream Alpha `P1-1..P1-8` / Nuzzlecap checklist is gone.
 
-### Added
+### Fork history (condensed from AGENTS.md §7)
+
+#### Added
 - **Phase 1 — rename + creator MVP** (`0277f22`): rebrand
   `fiorastudio/buddy` → `bbddy` (later `bbuddy`), extended `companions`
   schema with `creation_mode`, `personality_preset`, `custom_prompt`,
@@ -77,7 +83,7 @@ categories.
   `bbuddy_create` step returns a framed `.______.` card; species
   mode preview now embeds ASCII body via `getSpeciesPreviewFrame`.
 
-### Changed
+#### Changed
 - `bbddy` → `bbuddy` rename (466 replacements across 36 files) —
   package name, MCP server, DB path, tool names, slash commands.
 - Statusline wrapper is a self-contained Node script with zero HUD
@@ -86,7 +92,7 @@ categories.
   rewrote to prefer the `<!-- bbuddy: -->` comment pipeline over
   auto-invocation.
 
-### Fixed
+#### Fixed
 - Literal `\n` in MCP tool call payloads for mode 4 manual frames
   (Korean descriptions triggered this first).
 - `custom_idle_frames` now preserved across all `writeBuddyStatus`
@@ -99,7 +105,7 @@ categories.
   and buddy; reaction text moves into the line-3 slot so the anchor
   stays constant.
 
-### Removed
+#### Removed
 - Inline-HUD renderer in statusline wrapper — out of scope for the
   companion, reverted after review.
 - Statusline wrapper DB fallback; the server now always writes the
