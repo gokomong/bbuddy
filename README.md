@@ -70,6 +70,19 @@ cd ~/.bbuddy/server
 npm install && npm run build
 ```
 
+Bun 사용자는 npm 대신 Bun을 써도 된다 (≥1.0.0 지원, 5–10배 빠름):
+
+```bash
+git clone https://github.com/gokomong/bbuddy.git ~/.bbuddy/server
+cd ~/.bbuddy/server
+bun install && bun run build
+```
+
+빌드 산출물(`dist/`)은 동일하므로 MCP 등록·훅 설정 이하 단계는
+런타임 선택과 무관하게 같다. `better-sqlite3`는 네이티브 바이너리라
+Bun이 플랫폼에 따라 `node-gyp rebuild`를 요구할 수 있다. 실패하면
+`npm install` 로 폴백.
+
 `~/.claude/settings.json` 에 추가:
 ```json
 {
