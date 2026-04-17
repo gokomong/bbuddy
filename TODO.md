@@ -1,17 +1,16 @@
-# TODO - Project 'Buddy'
+# bbuddy — Active TODO
 
-## Alpha Phase (Complete)
-- [x] P1-1: Scaffolding
-- [x] P1-2: Hatching
-- [x] P1-3: Status + Presence
-- [x] P1-4: Dreaming Logic
-- [x] P1-5: Evolution Logic
-- [x] P1-6: Context-Aware Reactions
-- [x] P1-7: Persistence & Distribution
-- [x] P1-8: Community & SEO Overhaul (README)
+This file intentionally stays thin. Detailed roadmaps rot when two places
+claim to be authoritative.
 
-## Post-Alpha / Beta
-- [ ] Implement auto-config generation scripts for common IDEs.
-- [ ] Add more complex evolution mutations.
-- [ ] Implement "Shiny" variant ASCII art variations.
-- [ ] Expand the species library to 50+.
+- **Pending architectural / feature work**: see
+  [AGENTS.md §9 "Pending work"](./AGENTS.md). That section is updated in
+  the same commit as any structural change.
+- **Maintainer session log** (what was done, why, open threads):
+  [HANDOFF.md](./HANDOFF.md).
+- **Release-readiness checklist** for the v0.1.0 public launch: the
+  current 18-commit plan in the HANDOFF §"Session 6+" log (Sprint 1–4 for
+  audit/migration/CI/Bun/docs work).
+
+If you're a contributor opening an issue or PR, use the GitHub issue
+tracker rather than editing this file.
