@@ -1,5 +1,13 @@
 # bbuddy — Handoff Log
 
+> ⚠️ **Maintainer work journal — not user-facing documentation.**
+> This file contains session-by-session context, personal test-env
+> references, and raw design decisions. For project overview, install
+> instructions, and public docs see [README.md](./README.md). For
+> architecture, conventions, and tool inventory see
+> [AGENTS.md](./AGENTS.md). For the standardised release history see
+> [CHANGELOG.md](./CHANGELOG.md).
+
 A running narrative of what's been done, what decisions were made,
 and what's still open. If `AGENTS.md` is the reference manual, this
 is the work diary. Read it to reconstruct *why* the current code
