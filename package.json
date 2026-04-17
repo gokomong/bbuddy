@@ -21,7 +21,8 @@
     "start": "node dist/server/index.js",
     "dev": "ts-node src/server/index.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [
     "mcp",
@@ -57,6 +58,7 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.5.2",
+    "@vitest/coverage-v8": "^4.1.4",
     "gif-encoder-2": "^1.0.5",
     "gifenc": "^1.0.3",
     "pngjs": "^7.0.0",

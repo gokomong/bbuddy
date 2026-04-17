@@ -1,6 +1,7 @@
 # Build output
 node_modules
 dist
+coverage
 *.tsbuildinfo
 
 # Runtime data

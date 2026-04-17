@@ -31,6 +31,18 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Coverage (Node 20 only)
+        if: matrix.node == 20
+        run: npm run test:coverage
+
+      - name: Upload coverage summary
+        if: matrix.node == 20
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-summary
+          path: coverage/coverage-summary.json
+          if-no-files-found: warn
+
       - name: Audit
         run: npm audit --audit-level=high
         continue-on-error: true

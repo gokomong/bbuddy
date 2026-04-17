@@ -1,5 +1,10 @@
 # bbuddy — 직접 만드는 코딩 컴패니언
 
+[![test](https://img.shields.io/github/actions/workflow/status/gokomong/bbuddy/test.yml?branch=master&label=test)](https://github.com/gokomong/bbuddy/actions/workflows/test.yml)
+[![node](https://img.shields.io/badge/node-%E2%89%A518-brightgreen)](./package.json)
+[![tests](https://img.shields.io/badge/tests-315%20passing-brightgreen)](./src/__tests__)
+[![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
+
 > fiorastudio/buddy를 base로, **사용자가 직접 캐릭터를 만드는** 창작 레이어를 얹은 MCP 서버.
 
 ```
