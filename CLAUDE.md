@@ -10,7 +10,7 @@ before editing this project.
 - **What**: a statusline-resident ASCII companion (MCP server + hooks
   + slash commands). Fork of `fiorastudio/buddy`.
 - **Name**: `bbuddy`, not `bbddy`, not `buddy`.
-- **Runtime**: Node 18+, TypeScript (NodeNext), SQLite via
+- **Runtime**: Node 20+, TypeScript (NodeNext), SQLite via
   `better-sqlite3`, zero external HUD dependencies.
 - **Entry points**: `src/server/index.ts` (MCP tools),
   `src/statusline-wrapper.ts` (statusline renderer),

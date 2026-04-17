@@ -26,9 +26,9 @@ this tag.
   with `${CLAUDE_PLUGIN_ROOT}` / `${CODEX_PLUGIN_ROOT}` so
   marketplace installs wire the MCP server without `install.sh`.
 - **Added** — full `package.json` metadata (`keywords`, `author`,
-  `homepage`, `repository`, `bugs`, `engines` for Node ≥18 and Bun
+  `homepage`, `repository`, `bugs`, `engines` for Node ≥20 and Bun
   ≥1.0.0).
-- **Added** — GitHub Actions test matrix (Node 18 / 20 / 22), issue
+- **Added** — GitHub Actions test matrix (Node 20 / 22), issue
   templates, PR template, coverage tooling
   (`@vitest/coverage-v8` + `npm run test:coverage`).
 - **Added** — English SKILL.md for every slash command plus new skill

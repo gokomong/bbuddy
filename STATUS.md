@@ -11,7 +11,7 @@
 | Tests | ✅ 315 / 315 (`npm test`) |
 | Audit | ✅ 0 vulnerabilities (`npm audit`) |
 | License | MIT |
-| Node | ≥ 18 |
+| Node | ≥ 20 |
 | Default language | English (Korean via `bbuddy_language ko`) |
 
 ## Phase progression

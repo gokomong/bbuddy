@@ -1,7 +1,7 @@
 # bbuddy — 직접 만드는 코딩 컴패니언
 
 [![test](https://img.shields.io/github/actions/workflow/status/gokomong/bbuddy/test.yml?branch=master&label=test)](https://github.com/gokomong/bbuddy/actions/workflows/test.yml)
-[![node](https://img.shields.io/badge/node-%E2%89%A518-brightgreen)](./package.json)
+[![node](https://img.shields.io/badge/node-%E2%89%A520-brightgreen)](./package.json)
 [![tests](https://img.shields.io/badge/tests-315%20passing-brightgreen)](./src/__tests__)
 [![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 
@@ -167,7 +167,7 @@ Claude Code는 세션 시작 시 이 환경변수를 읽어 statusline 렌더러
 
 | 영역 | 선택 |
 |------|------|
-| 런타임 | Node.js 18+ / TypeScript (NodeNext) |
+| 런타임 | Node.js 20+ / TypeScript (NodeNext) |
 | DB | SQLite (better-sqlite3) at `~/.bbuddy/bbuddy.db` |
 | MCP | @modelcontextprotocol/sdk |
 | AI ASCII 생성 | Anthropic API (claude-haiku-4-5) |
