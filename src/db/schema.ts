@@ -3,15 +3,38 @@ import path from 'path';
 import { mkdirSync, existsSync, copyFileSync } from 'fs';
 import { homedir } from 'os';
 
+// Migrate from pre-rename locations if the new paths don't exist yet.
+// .bbddy/ is the Phase 1 rename; .buddy/ is the original upstream path.
+// First hit wins — .bbddy/ is newer and more likely to have recent data.
+// Exported so hooks (which can't import TypeScript) and tests can reuse it.
+export function migrateLegacyPaths(home: string = homedir()): void {
+  const newDir = path.join(home, '.bbuddy');
+  const newDb = path.join(newDir, 'bbuddy.db');
+  const legacyDbs = [
+    path.join(home, '.bbddy', 'bbddy.db'),
+    path.join(home, '.buddy', 'buddy.db'),
+  ];
+  if (!existsSync(newDb)) {
+    mkdirSync(newDir, { recursive: true });
+    for (const legacy of legacyDbs) {
+      if (existsSync(legacy)) {
+        try { copyFileSync(legacy, newDb); break; } catch { /* non-fatal */ }
+      }
+    }
+  }
+  const claudeDir = path.join(home, '.claude');
+  const newStatus = path.join(claudeDir, 'bbuddy-status.json');
+  const legacyStatus = path.join(claudeDir, 'bbddy-status.json');
+  if (existsSync(claudeDir) && !existsSync(newStatus) && existsSync(legacyStatus)) {
+    try { copyFileSync(legacyStatus, newStatus); } catch { /* non-fatal */ }
+  }
+}
+
+migrateLegacyPaths();
+
 const bbuddyDir = path.join(homedir(), '.bbuddy');
 mkdirSync(bbuddyDir, { recursive: true });
 const dbPath = path.join(bbuddyDir, 'bbuddy.db');
-
-// Migrate from old ~/.buddy/buddy.db if it exists and new DB doesn't
-const oldDbPath = path.join(homedir(), '.buddy', 'buddy.db');
-if (!existsSync(dbPath) && existsSync(oldDbPath)) {
-  try { copyFileSync(oldDbPath, dbPath); } catch { /* non-fatal */ }
-}
 
 export const db = new Database(dbPath);
 

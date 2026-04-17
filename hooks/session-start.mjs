@@ -4,13 +4,35 @@
  * Reads companion status and injects companion context into Claude's system prompt.
  * If no companion exists, prompts the user to create one.
  */
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, copyFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { createRequire } from 'module';
 
 const STATUS_PATH = join(homedir(), '.claude', 'bbuddy-status.json');
 const DB_PATH = join(homedir(), '.bbuddy', 'bbuddy.db');
+
+// Best-effort migration from pre-rename paths. Mirrors migrateLegacyPaths()
+// in src/db/schema.ts so the hook works even when the server hasn't been
+// invoked yet in this session. Silent on failure.
+(function migrate() {
+  try {
+    const bbuddyDir = join(homedir(), '.bbuddy');
+    if (!existsSync(DB_PATH)) {
+      mkdirSync(bbuddyDir, { recursive: true });
+      for (const legacy of [
+        join(homedir(), '.bbddy', 'bbddy.db'),
+        join(homedir(), '.buddy', 'buddy.db'),
+      ]) {
+        if (existsSync(legacy)) { copyFileSync(legacy, DB_PATH); break; }
+      }
+    }
+    const legacyStatus = join(homedir(), '.claude', 'bbddy-status.json');
+    if (!existsSync(STATUS_PATH) && existsSync(legacyStatus)) {
+      copyFileSync(legacyStatus, STATUS_PATH);
+    }
+  } catch { /* non-fatal */ }
+})();
 
 // Read hook input from stdin
 let input = {};
