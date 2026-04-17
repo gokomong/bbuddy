@@ -56,10 +56,20 @@ fi
 
 cd "$INSTALL_DIR"
 
-echo "  Installing dependencies..."
-npm install --quiet 2>/dev/null
-echo "  Building..."
-npm run build --quiet 2>/dev/null
+if command -v bun &> /dev/null; then
+  echo "  Installing dependencies (bun)..."
+  if ! bun install --silent 2>/dev/null; then
+    echo "  bun install failed — falling back to npm"
+    npm install --quiet 2>/dev/null
+  fi
+  echo "  Building (bun)..."
+  bun run build 2>/dev/null
+else
+  echo "  Installing dependencies..."
+  npm install --quiet 2>/dev/null
+  echo "  Building..."
+  npm run build --quiet 2>/dev/null
+fi
 
 SERVER_PATH="$INSTALL_DIR/dist/server/index.js"
 

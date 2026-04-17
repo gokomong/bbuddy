@@ -44,10 +44,22 @@ if (Test-Path $INSTALL_DIR) {
 }
 
 Push-Location $INSTALL_DIR
-Write-Host "  Installing dependencies..."
-npm install --quiet 2>$null
-Write-Host "  Building..."
-npm run build --quiet 2>$null
+$hasBun = $null -ne (Get-Command bun -ErrorAction SilentlyContinue)
+if ($hasBun) {
+  Write-Host "  Installing dependencies (bun)..."
+  bun install --silent 2>$null
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "  bun install failed — falling back to npm"
+    npm install --quiet 2>$null
+  }
+  Write-Host "  Building (bun)..."
+  bun run build 2>$null
+} else {
+  Write-Host "  Installing dependencies..."
+  npm install --quiet 2>$null
+  Write-Host "  Building..."
+  npm run build --quiet 2>$null
+}
 Pop-Location
 
 $SERVER_PATH      = "$INSTALL_DIR\dist\server\index.js"
