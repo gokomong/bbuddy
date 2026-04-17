@@ -1,7 +1,7 @@
 {
   "name": "bbuddy",
   "version": "0.1.0",
-  "description": "Create your own coding companion — AI ASCII generation, parts assembly, custom stats",
+  "description": "Create your own coding companion — AI ASCII generation, parts assembly, custom stats. MCP server + hooks + statusline renderer for Claude Code and Codex CLI.",
   "main": "dist/server/index.js",
   "bin": {
     "bbuddy-statusline": "dist/statusline-wrapper.js"
@@ -9,7 +9,11 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    ".claude-plugin",
+    ".codex-plugin",
+    "hooks",
+    "skills"
   ],
   "type": "module",
   "scripts": {
@@ -19,9 +23,33 @@
     "test": "vitest run",
     "test:watch": "vitest"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "claude-code",
+    "codex-cli",
+    "companion",
+    "ascii-art",
+    "statusline",
+    "virtual-pet",
+    "coding-buddy"
+  ],
+  "author": {
+    "name": "gokomong",
+    "url": "https://github.com/gokomong"
+  },
   "license": "MIT",
+  "homepage": "https://github.com/gokomong/bbuddy#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gokomong/bbuddy.git"
+  },
+  "bugs": {
+    "url": "https://github.com/gokomong/bbuddy/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "better-sqlite3": "^12.8.0"
