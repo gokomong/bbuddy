@@ -3,20 +3,21 @@ name: stats
 description: Show your bbuddy companion's stat breakdown
 ---
 
-# /bbuddy:stats — 스탯 카드 표시
+# /bbuddy:stats — Stat breakdown
 
-사용자가 `/bbuddy:stats` 를 입력하면 이 스킬을 실행한다.
+Run this skill when the user types `/bbuddy:stats`.
 
-## 역할
+## Role
 
-`bbuddy_status` MCP 도구를 호출해서 스탯 정보를 집중적으로 보여준다.
+Call `bbuddy_status` and emphasise the stat portion of the response.
 
-## 실행
+## Call
 
 ```
 bbuddy_status({})
 ```
 
-결과에서 스탯 바(DEBUGGING / PATIENCE / CHAOS / WISDOM / SNARK)와 레벨/XP 정보를 강조해서 표시한다.
-
-현재 피크 스탯(가장 높은 값)과 덤프 스탯(가장 낮은 값)도 함께 언급한다.
+In your reply, highlight the stat bars (DEBUGGING / PATIENCE / CHAOS /
+WISDOM / SNARK) and the level / XP line. Mention the peak stat (highest)
+and the dump stat (lowest) so the user sees the companion's personality
+shape at a glance.

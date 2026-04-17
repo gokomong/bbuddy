@@ -3,18 +3,19 @@ name: on
 description: Unmute your bbuddy companion
 ---
 
-# /bbuddy:on — 컴패니언 음소거 해제
+# /bbuddy:on — Unmute the companion
 
-사용자가 `/bbuddy:on` 을 입력하면 이 스킬을 실행한다.
+Run this skill when the user types `/bbuddy:on`.
 
-## 역할
+## Role
 
-`bbuddy_unmute` MCP 도구를 호출해서 컴패니언의 자동 반응을 다시 활성화한다.
+Call `bbuddy_unmute` to re-enable automatic reactions after a prior
+`/bbuddy:off`.
 
-## 실행
+## Call
 
 ```
 bbuddy_unmute({})
 ```
 
-결과 메시지를 간단히 표시한다.
+Show a brief confirmation message from the tool response.

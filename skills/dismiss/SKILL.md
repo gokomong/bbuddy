@@ -3,18 +3,21 @@ name: dismiss
 description: Permanently delete a saved bbuddy slot
 ---
 
-# /bbuddy:dismiss — 저장된 슬롯 삭제
+# /bbuddy:dismiss — Delete a saved slot
 
-사용자가 `/bbuddy:dismiss <slot>` 을 입력하면 이 스킬을 실행한다.
+Run this skill when the user types `/bbuddy:dismiss <slot>`.
 
-## 역할
+## Role
 
-저장된 슬롯을 영구히 삭제한다. 현재 활성 컴패니언에는 영향을 주지 않는다. 슬롯 안의 스냅샷만 사라진다. 한번 지운 슬롯은 복구되지 않으므로 사용자에게 의도가 맞는지 한 번 확인을 권장한다.
+Delete a saved slot forever. The active companion is untouched — only
+the slot snapshot is removed. This is irreversible, so confirm intent
+with the user before calling the tool.
 
-## 실행
+## Call
 
 ```
-bbuddy_dismiss({ slot: "<사용자가-지정한-이름>" })
+bbuddy_dismiss({ slot: "<user-provided-name>" })
 ```
 
-존재하지 않는 슬롯이면 그렇게 안내한다. 인자가 없으면 어떤 슬롯을 지울지 물어본다.
+If the slot doesn't exist, surface the tool's not-found message
+as-is. If the user didn't include a slot name, ask which one to drop.

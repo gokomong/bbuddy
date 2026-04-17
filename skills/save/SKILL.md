@@ -3,20 +3,24 @@ name: save
 description: Save the current bbuddy companion to a named slot for later swap
 ---
 
-# /bbuddy:save — 현재 컴패니언 저장
+# /bbuddy:save — Save the current companion to a slot
 
-사용자가 `/bbuddy:save <slot>` 을 입력하면 이 스킬을 실행한다.
+Run this skill when the user types `/bbuddy:save <slot>`.
 
-## 역할
+## Role
 
-현재 활성 bbuddy 컴패니언을 명명된 슬롯에 스냅샷으로 저장한다. 같은 슬롯 이름에 다시 저장하면 덮어쓴다. `bbuddy_summon` 으로 나중에 불러올 수 있다.
+Snapshot the active companion into a named slot. Re-saving to the same
+slot overwrites the previous snapshot. Later, `bbuddy_summon` restores
+from a slot.
 
-## 실행
+## Call
 
 ```
-bbuddy_save({ slot: "<사용자가-준-이름>" })
+bbuddy_save({ slot: "<user-provided-name>" })
 ```
 
-슬롯 이름은 1–24자 사이여야 한다. `__` 로 시작하는 이름은 내부 예약이라 거부된다.
+Slot names are 1–24 characters. Names starting with `__` are reserved
+for internal bookkeeping and will be rejected.
 
-저장 후 응답 텍스트를 그대로 보여준다. 인자가 없으면 사용자에게 슬롯 이름을 물어본다.
+Relay the response verbatim. If the user didn't include a slot name,
+ask for one before calling the tool.

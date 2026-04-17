@@ -3,23 +3,30 @@ name: summon
 description: Summon a saved bbuddy companion from a slot, replacing the current one
 ---
 
-# /bbuddy:summon — 저장된 컴패니언 소환
+# /bbuddy:summon — Summon a saved companion
 
-사용자가 `/bbuddy:summon <slot>` 을 입력하면 이 스킬을 실행한다.
+Run this skill when the user types `/bbuddy:summon <slot>`.
 
-## 역할
+## Role
 
-지정된 슬롯에서 컴패니언을 불러와 현재 활성 컴패니언을 교체한다. 교체하기 전에 현재 컴패니언을 자동으로 `__previous` 슬롯에 백업한다 — 그래서 한 번의 실수가 영구 손실이 아니다. `bbuddy_summon { slot: "__previous" }` 로 즉시 되돌릴 수 있다.
+Restore a companion from the named slot and make it the active one.
+Before swapping, the tool automatically backs up the current companion
+into the reserved `__previous` slot, so a single mis-summon is never a
+permanent loss — `bbuddy_summon({ slot: "__previous" })` reverts it.
 
-## 실행
+## Call
 
 ```
-bbuddy_summon({ slot: "<사용자가-지정한-이름>" })
+bbuddy_summon({ slot: "<user-provided-name>" })
 ```
 
-슬롯이 없으면 `bbuddy_list` 를 안내한다. 인자가 없으면 사용자에게 어떤 슬롯을 부를지 물어본다.
+If the slot doesn't exist, point the user at `/bbuddy:list` to see what
+is available. If the user didn't include a slot name, ask first.
 
-## 주의
+## Notes
 
-- 이전 컴패니언의 XP, memories, evolution_history 같은 부수 데이터는 DB에 그대로 남는다(슬롯에 백업된 companion id를 그대로 복원하므로 재소환 시 다시 연결됨).
-- 진짜 영구 삭제는 `bbuddy_dismiss` 또는 `bbuddy_respawn` 으로만 가능하다.
+- XP, memories, and evolution history for the prior companion stay in
+  the DB. The slot stores the companion id, so a later re-summon picks
+  up the same history.
+- Permanent deletion only happens through `bbuddy_dismiss` or
+  `bbuddy_respawn`.

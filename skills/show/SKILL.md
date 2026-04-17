@@ -3,18 +3,19 @@ name: show
 description: Show your bbuddy companion's status card
 ---
 
-# /bbuddy:show — 컴패니언 상태 카드 표시
+# /bbuddy:show — Display the companion card
 
-사용자가 `/bbuddy:show` 를 입력하면 이 스킬을 실행한다.
+Run this skill when the user types `/bbuddy:show`.
 
-## 역할
+## Role
 
-`bbuddy_status` MCP 도구를 호출해서 현재 컴패니언의 상태 카드를 보여준다.
+Call the `bbuddy_status` MCP tool to display the current companion's
+status card (ASCII, level, mood, stats, personality).
 
-## 실행
+## Call
 
 ```
 bbuddy_status({})
 ```
 
-결과를 그대로 사용자에게 표시한다. 별도 설명 없이 카드만 출력하면 된다.
+Relay the response verbatim — just print the card, no extra commentary.

@@ -3,21 +3,28 @@ name: rename
 description: Rename your bbuddy companion
 ---
 
-# /bbuddy:rename — 컴패니언 이름 변경
+# /bbuddy:rename — Rename the companion
 
-사용자가 `/bbuddy:rename` 을 입력하면 이 스킬을 실행한다.
+Run this skill when the user types `/bbuddy:rename`.
 
-## 역할
+## Role
 
-사용자에게 새 이름을 묻고, `bbuddy_create` 를 통해 이름을 변경한다.
+bbuddy has no dedicated rename tool. The supported path is to capture
+the current companion into a slot, respawn, and recreate under the new
+name with the same personality and stats preserved from the snapshot.
 
-## 흐름
+## Flow
 
-1. 현재 이름을 확인하기 위해 `bbuddy_status({})` 를 먼저 호출한다.
-2. 사용자에게 새 이름을 묻는다: `"새로운 이름을 입력하세요:"`
-3. `bbuddy_hatch({ name: "<새이름>", confirm: true })` 를 호출해서 이름을 업데이트한다.
+1. `bbuddy_status({})` to confirm the current name and stats.
+2. Ask the user for the new name.
+3. Inform the user that renaming requires recreating the companion;
+   confirm they want to proceed. If they agree:
+   - `bbuddy_save({ slot: "__rename_backup" })` to snapshot.
+   - `bbuddy_respawn({ confirm: true })` to clear the active companion.
+   - `bbuddy_create({ ..., name: "<new>", ..., confirm: true })` using
+     the same personality preset and stat distribution from step 1.
+4. Show the new card with `bbuddy_status({})`.
 
-## 주의
-
-이름 변경은 외형/성격/스탯에 영향을 주지 않는다.
-변경 후 `bbuddy_status({})` 를 호출해서 업데이트된 카드를 보여준다.
+If the user just wants a cosmetic nickname shown in the statusline,
+propose `bbuddy_evolve` with the same parts — that doesn't rename but
+often scratches the same itch.

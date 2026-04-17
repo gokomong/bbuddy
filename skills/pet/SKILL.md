@@ -3,18 +3,19 @@ name: pet
 description: Pet your bbuddy companion
 ---
 
-# /bbuddy:pet — 컴패니언 쓰다듬기
+# /bbuddy:pet — Pet the companion
 
-사용자가 `/bbuddy:pet` 을 입력하면 이 스킬을 실행한다.
+Run this skill when the user types `/bbuddy:pet`.
 
-## 역할
+## Role
 
-`bbuddy_pet` MCP 도구를 호출해서 컴패니언을 쓰다듬어준다. 기분이 오르고 소소한 반응이 나온다.
+Call the `bbuddy_pet` MCP tool. The companion's mood rises and you get a
+short reaction back.
 
-## 실행
+## Call
 
 ```
 bbuddy_pet({})
 ```
 
-반환된 텍스트(컴패니언 반응)를 그대로 사용자에게 보여준다.
+Show the returned text (the companion's reaction) to the user verbatim.
