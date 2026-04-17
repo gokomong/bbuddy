@@ -1,48 +1,56 @@
-# bbuddy — 직접 만드는 코딩 컴패니언
+# bbuddy — build your own coding companion
+
+🌐 **English** · [한국어](./README.ko.md)
 
 [![test](https://img.shields.io/github/actions/workflow/status/gokomong/bbuddy/test.yml?branch=master&label=test)](https://github.com/gokomong/bbuddy/actions/workflows/test.yml)
 [![node](https://img.shields.io/badge/node-%E2%89%A520-brightgreen)](./package.json)
 [![tests](https://img.shields.io/badge/tests-315%20passing-brightgreen)](./src/__tests__)
 [![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 
-> fiorastudio/buddy를 base로, **사용자가 직접 캐릭터를 만드는** 창작 레이어를 얹은 MCP 서버.
+> A statusline-resident ASCII companion for Claude Code and Codex CLI. Fork of
+> [fiorastudio/buddy](https://github.com/fiorastudio/buddy) with a creator
+> layer so **you design the character from scratch** — species, appearance,
+> personality, stats.
 
 ```
   /\_/\          ┌──────────────────────────────────────────┐
- ( ■.■ )  ─────▶ │ Mochi (Lv.7) · 츤데레                   │
+ ( ■.■ )  ─────▶ │ Mochi (Lv.7) · tsundere                  │
   > ~ <          │ DEBUGGING ████████████████  40           │
- /|___|\ HaCk!  │ PATIENCE  ██████████        25           │
+ /|___|\ HaCk!   │ PATIENCE  ██████████        25           │
                  │ CHAOS     ████              10           │
                  └──────────────────────────────────────────┘
-  AI가 만들어준 내 컴패니언
+  custom companion, 100-pt stat budget, 6 personality presets
 ```
 
-기존 buddy 프로젝트들은 전부 **"정해진 종족에서 배정/선택"** 구조다.  
-bbuddy만의 차별점: **종족·외형·성격·스탯을 사용자가 처음부터 직접 만든다.**
+Every other MCP-companion project hands you a **random species**. bbuddy is
+the one where **you pick every pixel** — or have Claude draw it for you.
 
 ---
 
-## 목차
+## Table of contents
 
-- [설치](#설치)
-- [빠른 시작](#빠른-시작)
-- [아키텍처](#아키텍처)
-- [Phase별 구현 내역](#phase별-구현-내역)
-  - [Phase 1 — 리네이밍 + Creator MVP](#phase-1--리네이밍--creator-mvp)
-  - [Phase 2 — 외형 창작 시스템](#phase-2--외형-창작-시스템)
-  - [Phase 3 — Claude Code 심화 통합](#phase-3--claude-code-심화-통합)
-  - [Phase 4 — Codex CLI 확장](#phase-4--codex-cli-확장)
-- [MCP 도구 레퍼런스](#mcp-도구-레퍼런스)
-- [Wizard 플로우](#wizard-플로우)
+- [Install](#install)
+- [Quick start](#quick-start)
+- [Architecture](#architecture)
+- [MCP tools](#mcp-tools)
+- [Wizard flow](#wizard-flow)
 - [Hooks](#hooks)
 - [Skills](#skills)
-- [파일 구조](#파일-구조)
+- [File layout](#file-layout)
+- [Testing](#testing)
+- [Credits](#credits)
+- [License](#license)
+
+Deeper docs: [AGENTS.md](./AGENTS.md) (architecture + conventions) ·
+[HANDOFF.md](./HANDOFF.md) (session-by-session decisions) ·
+[CHANGELOG.md](./CHANGELOG.md) (release history) ·
+[CONTRIBUTING.md](./CONTRIBUTING.md) (dev loop).
 
 ---
 
-## 설치
+## Install
 
-### 원클릭 설치 (권장)
+### One-click (recommended)
 
 **macOS / Linux**
 ```bash
@@ -54,364 +62,159 @@ curl -fsSL https://raw.githubusercontent.com/gokomong/bbuddy/master/install.sh |
 irm https://raw.githubusercontent.com/gokomong/bbuddy/master/install.ps1 | iex
 ```
 
-설치 스크립트가 자동으로 처리하는 것:
-- MCP 서버 빌드 (`~/.bbuddy/server/`)
-- Claude Code / Cursor / Windsurf / Codex CLI MCP 등록
-- Claude Code hooks 등록 (SessionStart, Stop, Pre/PostToolUse)
-- Skills 설치 (`/bbuddy:create` 등)
-- Statusline 설정
-- 각 CLI 프롬프트 파일에 컴패니언 지시문 주입
+The installer handles:
 
-### 수동 설치
+- Build the MCP server under `~/.bbuddy/server/`
+- Register the MCP server with Claude Code / Cursor / Windsurf / Codex CLI
+- Wire Claude Code hooks (SessionStart, Stop, Pre/PostToolUse)
+- Copy slash-command skills (`/bbuddy:create`, `:show`, `:pet`, …)
+- Inject the statusline env var into your shell RC file
+- Append the companion system-prompt to each CLI's instruction file
 
-```bash
-git clone https://github.com/gokomong/bbuddy.git ~/.bbuddy/server
-cd ~/.bbuddy/server
-npm install && npm run build
-```
+The installer auto-detects **Bun** and uses it when present (5–10× faster
+`install`), falling back to `npm` if the native rebuild fails.
 
-Bun 사용자는 npm 대신 Bun을 써도 된다 (≥1.0.0 지원, 5–10배 빠름):
+### Manual install
 
 ```bash
 git clone https://github.com/gokomong/bbuddy.git ~/.bbuddy/server
 cd ~/.bbuddy/server
-bun install && bun run build
+npm install && npm run build      # or: bun install && bun run build
 ```
 
-빌드 산출물(`dist/`)은 동일하므로 MCP 등록·훅 설정 이하 단계는
-런타임 선택과 무관하게 같다. `better-sqlite3`는 네이티브 바이너리라
-Bun이 플랫폼에 따라 `node-gyp rebuild`를 요구할 수 있다. 실패하면
-`npm install` 로 폴백.
-
-`~/.claude/settings.json` 에 추가:
+Add to `~/.claude/settings.json`:
 ```json
 {
   "mcpServers": {
     "bbuddy": {
       "command": "node",
-      "args": ["~/.bbuddy/server/dist/server/index.js"]
+      "args": ["/absolute/path/to/.bbuddy/server/dist/server/index.js"]
     }
   }
 }
 ```
 
----
-
-## 빠른 시작
-
-### 컴패니언 만들기
-
-새 Claude Code 세션에서:
-
-```
-bbuddy_create 도구 호출
-또는 /bbuddy:create 입력
-```
-
-wizard가 단계별로 안내한다:
-
-```
-[1/5] 이름 짓기       → "Mochi"
-[2/5] 외형 선택       → 1종족 / 2파츠조합 / 3AI생성 / 4직접타이핑
-[3/5] 성격 설정       → 츤데레 / 열정적 / 냉정한 / 장난꾸러기 / 현자 / 커스텀
-[4/5] 스탯 분배       → 100pt를 5개 스탯에 자유 배분
-[5/5] 확인 & 저장     → 프리뷰 카드 → confirm: true
-```
-
-### 상태 확인
-
-```
-bbuddy_status
-/bbuddy:show
-```
-
-### Statusline 설정
-
-원클릭 설치 스크립트가 shell RC 파일(`~/.zshrc` / `~/.bashrc` /
-PowerShell `$PROFILE`)에 다음 환경변수를 추가해 자동 설정한다:
-
+For the statusline, add this to your shell RC file (`~/.zshrc`,
+`~/.bashrc`, or PowerShell `$PROFILE`):
 ```bash
 export CLAUDE_CODE_STATUSLINE_CMD="node $HOME/.bbuddy/server/dist/statusline-wrapper.js"
 ```
 
-수동 설정을 원하면 같은 줄을 shell RC에 직접 붙여넣으면 된다.
-Claude Code는 세션 시작 시 이 환경변수를 읽어 statusline 렌더러로 사용한다.
-`settings.json`에는 관련 필드가 없다.
+Claude Code reads that env var at session start; there is no
+`settings.json` field for statusline command.
 
 ---
 
-## 아키텍처
+## Quick start
+
+### Create your companion
+
+In a Claude Code session:
+
+```
+/bbuddy:create
+```
+
+The wizard renders a framed card at every step:
+
+```
+[1/4] Choose a name            → "Mochi"
+[2/4] Pick appearance mode     → 1 species | 2 parts | 3 AI draws | 4 manual
+[3/4] Pick personality preset  → tsundere / passionate / cold / prankster / sage / custom
+[4/4] Distribute stats         → 100 pt across DEBUGGING / PATIENCE / CHAOS / WISDOM / SNARK
+Preview → confirm: true → saved
+```
+
+### Check status
+
+```
+/bbuddy:show
+```
+
+### Other commands
+
+`/bbuddy:pet`, `/bbuddy:stats`, `/bbuddy:evolve`, `/bbuddy:save <slot>`,
+`/bbuddy:list`, `/bbuddy:summon <slot>`, `/bbuddy:dismiss <slot>`,
+`/bbuddy:language en|ko`, `/bbuddy:off`, `/bbuddy:on`, `/bbuddy:respawn`.
+Full list in [Skills](#skills).
+
+---
+
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────┐
-│              bbuddy creator layer            │  ← 이번에 만든 것
+│             bbuddy creator layer            │
 │                                             │
-│  wizard   AI생성기   파츠조합   직접입력      │
-│  성격설정  스탯분배  커스텀스프라이트 관리     │
+│   wizard   AI delegation   parts combiner   │
+│   personality   stats   custom sprites      │
 └──────────────────────┬──────────────────────┘
                        │ fork + extends
 ┌──────────────────────┴──────────────────────┐
-│           fiorastudio/buddy (base)          │
+│          fiorastudio/buddy (base)           │
 │                                             │
-│  MCP Server    SQLite    21종 스프라이트     │
-│  XP/레벨       Observer  메모리/꿈           │
-│  Rarity/스탯   StatusLine  설치스크립트      │
-└─────────────────────────────────────────────┘
+│   MCP server   SQLite   21 species          │
+│   XP / leveling  observer  memories/dreams  │
+│   rarity / stats   statusline renderer      │
+└──────────────────────┬──────────────────────┘
                        │ runs on
 ┌──────────────────────┴──────────────────────┐
-│  Claude Code  Cursor  Windsurf  Codex CLI   │
+│   Claude Code · Cursor · Windsurf · Codex   │
 └─────────────────────────────────────────────┘
 ```
 
-### 기술 스택
+### Tech stack
 
-| 영역 | 선택 |
-|------|------|
-| 런타임 | Node.js 20+ / TypeScript (NodeNext) |
-| DB | SQLite (better-sqlite3) at `~/.bbuddy/bbuddy.db` |
-| MCP | @modelcontextprotocol/sdk |
-| AI ASCII 생성 | Anthropic API (claude-haiku-4-5) |
-| 테스트 | Vitest (315 tests) |
-| 빌드 | tsc |
+| Area | Choice |
+|---|---|
+| Runtime | Node.js 20+ / TypeScript (NodeNext) — Bun 1.0+ also supported |
+| Database | SQLite (`better-sqlite3`) at `~/.bbuddy/bbuddy.db` |
+| MCP | `@modelcontextprotocol/sdk` |
+| AI ASCII generation | Delegated to host LLM (no API key required) |
+| Tests | Vitest (315 passing) |
+| Build | `tsc` |
 
----
-
-## Phase별 구현 내역
-
-### Phase 1 — 리네이밍 + Creator MVP
-
-**커밋:** `0277f22`
-
-fiorastudio/buddy를 fork해서 bbuddy로 리브랜딩하고 기본 Creator 레이어를 얹었다.
-
-#### 변경 파일
-
-**`package.json`**
-- `@fiorastudio/buddy` → `bbuddy`
-- bin: `buddy-statusline` → `bbuddy-statusline`
-
-**`src/db/schema.ts`**
-- DB 경로: `~/.buddy/buddy.db` → `~/.bbuddy/bbuddy.db`
-- 기존 DB 자동 마이그레이션 (구 경로 감지 시 복사)
-- companions 테이블 컬럼 추가:
-  ```sql
-  creation_mode TEXT DEFAULT 'hatched'   -- 'hatched' | 'created'
-  personality_preset TEXT
-  custom_prompt TEXT
-  stats_mode TEXT DEFAULT 'rolled'       -- 'rolled' | 'manual'
-  rarity TEXT
-  eye TEXT
-  hat TEXT
-  stats_json TEXT
-  ```
-
-**`src/lib/types.ts`**
-- `PERSONALITY_PRESETS`, `PersonalityPreset` 타입 추가
-- `Companion` 타입에 optional 필드 추가 (비파괴적)
-
-**`src/server/index.ts`**
-- 도구 9개 전부 `buddy_*` → `bbuddy_*`
-- 리소스 URI `buddy://` → `bbuddy://`
-- `loadCompanion()`: `creation_mode === 'created'` 분기 추가
-- `bbuddy_create` MCP 도구 추가 (모드 1: 종족 선택)
-
-**신규 파일**
-
-| 파일 | 역할 |
-|------|------|
-| `src/creator/presets.ts` | 성격 프리셋 6종 + `generatePresetBio()` |
-| `src/creator/stats.ts` | `validateStatDistribution()`, `normaliseStats()`, STAT_POOL=100 |
-| `src/creator/wizard.ts` | `evaluateWizardState()` — 단계별 상태 계산 |
-| `src/creator/index.ts` | re-export |
-| `src/__tests__/creator.test.ts` | 23개 테스트 |
+For full Phase 1–6 history, see [AGENTS.md §7](./AGENTS.md) and
+[CHANGELOG.md](./CHANGELOG.md).
 
 ---
 
-### Phase 2 — 외형 창작 시스템
+## MCP tools
 
-**커밋:** `42a7547`
+| Tool | Description |
+|---|---|
+| `bbuddy_create` | Wizard-based companion creation (modes 1–4) |
+| `bbuddy_hatch` | Hash-seeded random companion from the 21 built-in species |
+| `bbuddy_status` | Render the companion card |
+| `bbuddy_pet` | Pet the companion — mood bump + small reaction |
+| `bbuddy_observe` | Opt-in coding-task reaction as a speech-bubble card + XP (use the `<!-- bbuddy: -->` comment pipeline for ambient reactions instead) |
+| `bbuddy_evolve` | Change appearance only (same personality / stats / XP) |
+| `bbuddy_remember` | Save a long-term memory |
+| `bbuddy_dream` | Consolidate memories into personality drift |
+| `bbuddy_mute` / `bbuddy_unmute` | Toggle observer chatter |
+| `bbuddy_respawn` | Permanently release the active companion |
+| `bbuddy_save` | Snapshot the current companion into a named slot |
+| `bbuddy_list` | List saved slots |
+| `bbuddy_summon` | Restore from a slot (current companion auto-backed up to `__previous`) |
+| `bbuddy_dismiss` | Permanently delete a saved slot |
+| `bbuddy_language` | Switch UI language (`en` / `ko`) |
 
-Wizard에 `appearance_mode` 분기를 추가하고 3가지 외형 생성 방식을 구현했다.
+### Reaction pipeline — prefer the comment
 
-#### 외형 모드 4종
-
-**모드 1: 기본 종족**  
-기존 21종 중 선택. 해시 기반 bones(rarity/stats/eye/hat)는 그대로 유지.
-
-**모드 2: 파츠 조합** (`src/creator/parts-combiner.ts`)
-```
-얼굴: round / square / pointy / blob
-눈:   · o O > ^ ♥ x ■ (또는 직접 입력)
-악세: hat / crown / horns / ears / halo / antenna / bow / none
-몸통: arms / tiny / legs / tail / float / none
-```
-- `parts.json`에서 파츠 데이터 로드 (`{E}` 플레이스홀더로 눈 위치 표시)
-- 3개 idle 프레임 자동 생성: `·` (기본), `-` (깜빡), `^` (윙크)
-- happy/sad/working 프레임 자동 파생
-
-**모드 3: AI 생성** (호스트 LLM에 위임)
-```
-별도 API 키 불필요 — 호스트(Claude Code / Codex)가 직접 그림
-서버는 제약과 다음 호출 템플릿을 텍스트로 반환
-호스트 LLM이 프레임 3개를 생성해 bbuddy_create를 manual_frame1/2/3로 재호출
-내부적으로는 모드 4와 동일한 parseManualInput 경로를 탄다
-```
-
-**모드 4: 직접 타이핑** (`src/creator/manual-input.ts`)
-```
-frame1 필수 (줄바꿈 \n으로 구분), frame2/frame3 선택
-최대 6줄 × 14자 트리밍
-frame2 생략 시 눈 변환으로 자동 생성
-```
-
-#### DB 확장
-
-```sql
-CREATE TABLE IF NOT EXISTS custom_sprites (
-  companion_id  TEXT PRIMARY KEY,
-  idle_frames   TEXT NOT NULL,   -- JSON: string[][]
-  happy_frame   TEXT,
-  sad_frame     TEXT,
-  working_frame TEXT,
-  created_at    TEXT DEFAULT (datetime('now')),
-  updated_at    TEXT DEFAULT (datetime('now')),
-  FOREIGN KEY(companion_id) REFERENCES companions(id)
-);
-```
-
-#### 새 MCP 도구
-
-**`bbuddy_evolve`** — 기존 컴패니언 외형 변경  
-이름·성격·스탯은 유지, 스프라이트만 교체. 모드 2/3/4 모두 지원.
-
-#### Statusline 연동
-
-`writeBuddyStatus()`가 `custom_sprites` 테이블을 조회해서  
-`custom_idle_frames`를 status JSON에 포함 →  
-`statusline-wrapper.ts`가 이 프레임을 우선 사용하고 없으면 기본 종족 스프라이트로 fallback.
+`bbuddy_observe` is explicit-only. For ambient coding reactions use the
+`<!-- bbuddy: {≤15 chars} -->` comment at the end of a Claude response —
+the Stop hook collects it and displays it as a statusline bubble. The
+comment path costs ~15 tokens; `bbuddy_observe` costs ~200. The
+installer injects that convention into each CLI's system prompt.
 
 ---
 
-### Phase 3 — Claude Code 심화 통합
+## Wizard flow
 
-**커밋:** `0cdaa5b`
-
-#### Hooks
-
-| 파일 | 이벤트 | 역할 |
-|------|--------|------|
-| `hooks/session-start.mjs` | SessionStart | status 파일 읽기 → 컴패니언 컨텍스트를 Claude 시스템 프롬프트에 주입. 없으면 생성 안내 |
-| `hooks/stop.mjs` | Stop | 대화 transcript에서 `<!-- bbuddy: ... -->` 추출 → status JSON에 reaction 저장 |
-| `hooks/pre-tool-use.mjs` | PreToolUse(Bash) | working 상태 설정 (⚙ 인디케이터) |
-| `hooks/post-tool-use.mjs` | PostToolUse(Bash) | exit code 감지: 성공 → excited(★), 실패 → concerned(>.<) |
-
-`~/.claude/settings.json`에 자동 등록:
-```json
-{
-  "hooks": {
-    "SessionStart": [{ "type": "command", "command": "node .../session-start.mjs" }],
-    "Stop":         [{ "type": "command", "command": "node .../stop.mjs" }],
-    "PreToolUse":   [{ "matcher": "Bash", "hooks": [{ "type": "command", "command": "node .../pre-tool-use.mjs" }] }],
-    "PostToolUse":  [{ "matcher": "Bash", "hooks": [{ "type": "command", "command": "node .../post-tool-use.mjs" }] }]
-  }
-}
-```
-
-#### `<!-- bbuddy: -->` 코멘트 시스템
-
-SessionStart hook이 주입하는 규칙:
-```
-의미 있는 순간(에러/성공/리팩토링)에 응답 맨 끝에
-<!-- bbuddy: {15자 이내 반응} -->
-을 붙여라.
-```
-
-Stop hook이 이 코멘트를 수거 → statusline 말풍선에 표시.
-
-#### Skills
-
-| 커맨드 | 파일 | 역할 |
-|--------|------|------|
-| `/bbuddy:create`  | `skills/create/SKILL.md`  | wizard 플로우 안내, bbuddy_create 호출 |
-| `/bbuddy:show`    | `skills/show/SKILL.md`    | bbuddy_status 호출 |
-| `/bbuddy:pet`     | `skills/pet/SKILL.md`     | bbuddy_pet 호출 |
-| `/bbuddy:stats`   | `skills/stats/SKILL.md`   | 스탯 카드 표시 |
-| `/bbuddy:rename`  | `skills/rename/SKILL.md`  | 이름 변경 플로우 |
-| `/bbuddy:evolve`  | `skills/evolve/SKILL.md`  | 외형 변경 wizard |
-| `/bbuddy:off`     | `skills/off/SKILL.md`     | bbuddy_mute |
-| `/bbuddy:on`      | `skills/on/SKILL.md`      | bbuddy_unmute |
-| `/bbuddy:save`    | `skills/save/SKILL.md`    | 현재 컴패니언을 슬롯에 저장 |
-| `/bbuddy:list`    | `skills/list/SKILL.md`    | 저장된 슬롯 목록 |
-| `/bbuddy:summon`  | `skills/summon/SKILL.md`  | 슬롯에서 컴패니언 소환 (현재 컴패니언은 `__previous`로 백업) |
-| `/bbuddy:dismiss` | `skills/dismiss/SKILL.md` | 슬롯 삭제 |
-| `/bbuddy:language`| `skills/language/SKILL.md`| UI 언어 전환 (`en` / `ko`) |
-
-#### Plugin 매니페스트
-
-`.claude-plugin/plugin.json` — Claude Code 플러그인 등록 정보.
-
----
-
-### Phase 4 — Codex CLI 확장
-
-**커밋:** `ce0e1d8`
-
-Codex는 커스텀 statusline을 지원하지 않기 때문에  
-**Stop hook의 stdout**으로 스프라이트를 렌더링하는 방식으로 대응.
-
-| 파일 | 역할 |
-|------|------|
-| `hooks/codex-session-start.mjs` | 영문 포맷 컴패니언 컨텍스트 주입 |
-| `hooks/codex-stop.mjs` | transcript 파싱 + ANSI 스프라이트 stdout 렌더링 |
-| `.codex-plugin/plugin.json` | Codex 플러그인 매니페스트 |
-
-`codex-stop.mjs`는 status 파일에서 프레임을 읽어 ANSI 컬러로 직접 출력한다:
-```
-  /\_/\   Mochi (Custom, Lv.7)
- ( ■.■ )  happy  XP:420
-  > ~ <   "버그 잡았어!"
- /|___|\ 
-```
-
-Pre/PostToolUse는 Claude Code용 훅(`pre-tool-use.mjs`, `post-tool-use.mjs`)을 그대로 공유.
-
----
-
-## MCP 도구 레퍼런스
-
-### 기존 도구 (fiorastudio/buddy에서 리네이밍)
-
-| 도구 | 설명 |
-|------|------|
-| `bbuddy_hatch` | 해시 기반 랜덤 컴패니언 생성 |
-| `bbuddy_status` | 컴패니언 카드 표시 |
-| `bbuddy_observe` | 작업 보고 → XP 획득 + 반응 |
-| `bbuddy_pet` | 쓰다듬기 → 기분 상승 |
-| `bbuddy_remember` | 메모리 저장 |
-| `bbuddy_dream` | 꿈 생성 |
-| `bbuddy_mute` | Observer 음소거 |
-| `bbuddy_unmute` | 음소거 해제 |
-| `bbuddy_respawn` | 컴패니언 리셋 |
-
-### 신규 도구 (bbuddy 추가)
-
-| 도구 | 설명 |
-|------|------|
-| `bbuddy_create` | Wizard 기반 컴패니언 생성 (모드 1~4) |
-| `bbuddy_evolve` | 기존 컴패니언 외형 변경 |
-| `bbuddy_save` | 현재 컴패니언을 슬롯에 저장 |
-| `bbuddy_list` | 저장된 슬롯 나열 |
-| `bbuddy_summon` | 슬롯에서 컴패니언 소환 (현재 컴패니언은 `__previous`로 자동 백업) |
-| `bbuddy_dismiss` | 슬롯 삭제 |
-| `bbuddy_language` | UI 언어 전환 (`en` / `ko`) |
-
----
-
-## Wizard 플로우
-
-`bbuddy_create` / `bbuddy_evolve`는 **single-call stateless** 방식이다.  
-파라미터가 불완전하면 다음 단계 안내 텍스트를 반환하고,  
-전부 채우고 `confirm: true`를 넣으면 저장한다.
+`bbuddy_create` / `bbuddy_evolve` is **stateless** — the tool evaluates
+whatever parameters you pass, renders the next step as a framed card,
+and returns. Keep re-calling with accumulated parameters until
+`confirm: true` commits.
 
 ```
 name
@@ -419,48 +222,48 @@ name
         ├─ "1" ─▶ species ──────────────────────┐
         ├─ "2" ─▶ parts (face/eye/accessory/body)┤
         ├─ "3" ─▶ ai_prompt ────────────────────┤
-        └─ "4" ─▶ manual_frame1 ────────────────┘
+        └─ "4" ─▶ manual_frame1/2/3 ────────────┘
                                                  │
-                                          personality_preset
+                                        personality_preset
                                                  │
-                                               stats
+                                              stats
                                                  │
-                                            confirm: true
+                                          confirm: true
                                                  │
-                                           ✅ 저장 완료
+                                          saved ✅
 ```
 
-### 파라미터 전체
+### Parameter signature
 
 ```typescript
 bbuddy_create({
   name: string,
   appearance_mode: "1" | "2" | "3" | "4",
 
-  // 모드 1
-  species?: string,                         // 21종 중 하나
+  // mode 1
+  species?: string,                         // one of 21 built-ins
 
-  // 모드 2
+  // mode 2
   parts?: {
     face: "round" | "square" | "pointy" | "blob",
-    eye: string,                            // "·" "o" "♥" 등
-    accessory: "hat" | "crown" | "horns" | "ears" | "halo" | "antenna" | "bow" | "none",
-    body: "arms" | "tiny" | "legs" | "tail" | "float" | "none",
+    eye: string,                            // "·" "o" "♥" any char
+    accessory: "hat"|"crown"|"horns"|"ears"|"halo"|"antenna"|"bow"|"none",
+    body: "arms"|"tiny"|"legs"|"tail"|"float"|"none",
   },
 
-  // 모드 3
-  ai_prompt?: string,                       // "선글라스 고양이" 등
+  // mode 3 — host LLM draws the ASCII
+  ai_prompt?: string,                       // "cat wearing sunglasses"
 
-  // 모드 4
-  manual_frame1?: string,                   // "\n"으로 줄 구분
+  // mode 4 — raw ASCII, \n-separated, ≤ 6 rows × 14 cols
+  manual_frame1?: string,
   manual_frame2?: string,
   manual_frame3?: string,
 
-  // 공통
-  personality_preset?: "tsundere" | "passionate" | "cold" | "prankster" | "sage" | "custom",
-  custom_prompt?: string,                   // personality_preset === "custom"일 때
+  // shared
+  personality_preset?: "tsundere"|"passionate"|"cold"|"prankster"|"sage"|"custom",
+  custom_prompt?: string,                   // required when preset === "custom"
   stats?: {
-    DEBUGGING: number,  // 합계 100, 각 1~80
+    DEBUGGING: number,   // sum = 100, each 1–80
     PATIENCE: number,
     CHAOS: number,
     WISDOM: number,
@@ -474,143 +277,142 @@ bbuddy_create({
 
 ## Hooks
 
-### 등록 위치
+| File | Event | Role |
+|---|---|---|
+| `hooks/session-start.mjs` | SessionStart | Read status file → inject companion context into Claude's system prompt. Prompt for `/bbuddy:create` if no companion exists. |
+| `hooks/stop.mjs` | Stop | Scan the transcript for `<!-- bbuddy: ... -->` and store the reaction in the status file. |
+| `hooks/pre-tool-use.mjs` | PreToolUse(Bash) | Set `working` indicator (⚙). |
+| `hooks/post-tool-use.mjs` | PostToolUse(Bash) | Exit code ↦ `excited` (★) on success, `concerned` (>.<) on failure. |
+| `hooks/codex-session-start.mjs` | Codex CLI | Same as session-start, English-only context. |
+| `hooks/codex-stop.mjs` | Codex CLI | Render an ANSI sprite to stdout (Codex has no statusline API). |
 
-- **Claude Code**: `~/.claude/settings.json` → `hooks`
-- **Codex**: `~/.codex/settings.json` → `hooks`
+### Reaction schema
 
-### 반응 시스템
-
-status JSON(`~/.claude/bbuddy-status.json`)의 reaction 필드:
+Written to `~/.claude/bbuddy-status.json`:
 
 ```typescript
 {
   reaction: "excited" | "concerned" | "working" | "chime",
   reaction_expires: number,      // ms timestamp
-  reaction_eye: string,          // eye override (★, >.<)
-  reaction_indicator: string,    // name 옆 표시 (!, ...)
-  reaction_text: string,         // 말풍선 텍스트
+  reaction_eye: string,          // e.g. "★" or ">.<"
+  reaction_indicator: string,    // shown next to the name
+  reaction_text: string,         // bubble content
 }
 ```
-
-| 트리거 | reaction | eye | 텍스트 |
-|--------|----------|-----|--------|
-| Bash 성공 | excited | ★ | 잘됐다! / 굿! / 완료! |
-| Bash 실패 | concerned | >.< | 괜찮아... / 다시 해봐 |
-| Bash 실행 중 | working | (유지) | — |
-| Claude 반응 코멘트 | chime | (유지) | <!-- bbuddy: ... --> 내용 |
 
 ---
 
 ## Skills
 
-Claude Code에서 `/bbuddy:` 로 시작하는 커맨드로 호출.  
-각 SKILL.md가 Claude에게 어떤 MCP 도구를 어떻게 호출할지 지시한다.
+Invoked as `/bbuddy:<name>` in Claude Code. Each `SKILL.md` is a short
+instruction file telling Claude which MCP tool to call and how to
+present the response.
 
-```bash
-/bbuddy:create   # 컴패니언 생성 wizard
-/bbuddy:show     # 상태 카드
-/bbuddy:pet      # 쓰다듬기
-/bbuddy:stats    # 스탯 상세
-/bbuddy:rename   # 이름 변경
-/bbuddy:evolve   # 외형 변경
-/bbuddy:off      # 음소거
-/bbuddy:on       # 음소거 해제
+```
+/bbuddy:create    wizard to build a new companion
+/bbuddy:show      companion status card
+/bbuddy:pet       pet the companion
+/bbuddy:stats     stat breakdown
+/bbuddy:rename    rename (snapshot → respawn → recreate)
+/bbuddy:evolve    change appearance
+/bbuddy:save      save to a named slot
+/bbuddy:list      list saved slots
+/bbuddy:summon    load from a slot
+/bbuddy:dismiss   delete a saved slot
+/bbuddy:language  switch UI language (en|ko)
+/bbuddy:hatch     random companion roll
+/bbuddy:observe   explicit reaction card (opt-in)
+/bbuddy:remember  save a memory
+/bbuddy:dream     consolidate memories
+/bbuddy:respawn   delete the active companion (destructive)
+/bbuddy:off       mute observer chatter
+/bbuddy:on        unmute
 ```
 
 ---
 
-## 파일 구조
+## File layout
 
 ```
 bbuddy/
 ├── src/
-│   ├── server/
-│   │   └── index.ts              # MCP 서버 (10개 도구, 3개 리소스)
-│   ├── creator/                  # ← bbuddy 신규
-│   │   ├── presets.ts            # 성격 프리셋 6종
-│   │   ├── stats.ts              # 스탯 분배 검증
-│   │   ├── wizard.ts             # Wizard 상태 계산
-│   │   ├── parts-combiner.ts     # 파츠 조합 → CustomSprite
-│   │   ├── ai-generator.ts       # Anthropic API → ASCII 아트
-│   │   ├── manual-input.ts       # 자유 입력 → CustomSprite
-│   │   ├── sprites/parts.json    # 파츠 데이터
-│   │   └── index.ts              # re-export
-│   ├── db/schema.ts              # SQLite 스키마 + 마이그레이션
-│   ├── lib/                      # base에서 상속
-│   │   ├── types.ts
-│   │   ├── species.ts
-│   │   ├── observer.ts
-│   │   └── ...
-│   ├── statusline-wrapper.ts     # 터미널 상태바 렌더러
-│   └── __tests__/
-│       ├── creator.test.ts       # Phase 1 테스트 (23개)
-│       └── creator-phase2.test.ts # Phase 2 테스트 (28개)
-│
-├── hooks/                        # ← bbuddy 신규
-│   ├── session-start.mjs         # Claude Code: 시스템 프롬프트 주입
-│   ├── stop.mjs                  # Claude Code: 반응 코멘트 수거
-│   ├── pre-tool-use.mjs          # 공용: working 상태 설정
-│   ├── post-tool-use.mjs         # 공용: 성공/실패 반응
-│   ├── codex-session-start.mjs   # Codex: 영문 컨텍스트 주입
-│   └── codex-stop.mjs            # Codex: stdout 스프라이트 렌더링
-│
-├── skills/                       # ← bbuddy 신규 (18 slash commands)
-│   ├── create/ show/ pet/ stats/ rename/ evolve/
-│   ├── off/ on/ hatch/ respawn/ observe/ remember/ dream/
-│   └── save/ list/ summon/ dismiss/ language/
-│
-├── .claude-plugin/plugin.json    # Claude Code 플러그인 매니페스트
-├── .codex-plugin/plugin.json     # Codex 플러그인 매니페스트
-├── install.sh                    # macOS/Linux 설치 스크립트
-├── install.ps1                   # Windows 설치 스크립트
+│   ├── server/index.ts           # MCP server — 16 tools + resources
+│   ├── creator/
+│   │   ├── wizard.ts             # state machine + shared .___. card shell
+│   │   ├── parts-combiner.ts     # mode 2 (face/eye/accessory/body)
+│   │   ├── manual-input.ts       # mode 4 (raw ASCII)
+│   │   ├── presets.ts            # 6 personality presets + bio templates
+│   │   ├── stats.ts              # 100-pt stat distribution validator
+│   │   └── sprites/parts.json
+│   ├── db/schema.ts              # SQLite schema + legacy-path migration
+│   ├── i18n/                     # English (default) + Korean catalogs
+│   ├── lib/                      # types, species, observer, leveling…
+│   ├── statusline-wrapper.ts     # ~1 s statusline renderer
+│   └── __tests__/                # vitest (315)
+├── hooks/*.mjs                   # Claude Code + Codex hooks
+├── skills/*/SKILL.md             # 18 slash commands
+├── .claude-plugin/               # Claude Code plugin manifest + .mcp.json
+├── .codex-plugin/                # Codex plugin manifest + .mcp.json
+├── install.sh · install.ps1      # One-click installers
 └── package.json
 ```
 
 ---
 
-## 환경변수
-
-별도의 환경변수가 필요 없습니다. 모드 3(AI 생성)은 호스트 LLM(Claude Code / Codex)에 위임하므로 별도의 API 키를 요구하지 않습니다.
-
----
-
-## 테스트
+## Testing
 
 ```bash
-npm test          # 315개 테스트 실행
-npm run build     # TypeScript 컴파일
+npm test                # 315 tests (vitest)
+npm run test:coverage   # coverage report under coverage/
+npm run build           # TypeScript → dist/
 ```
+
+Coverage at 35% line — the high-value creator, species, lib paths are
+well-covered; `src/server/index.ts` (MCP tool handlers) is integration
+surface and is exercised manually through Claude Code rather than unit
+tests.
+
+No API key is required to run anything — AI appearance generation
+(mode 3) delegates to the host LLM (Claude Code / Codex) itself.
 
 ---
 
 ## Credits
 
-Forked from [**fiorastudio/buddy**](https://github.com/fiorastudio/buddy) —
-the original MCP companion project (18 species, MCP server scaffolding,
-statusline renderer, XP / dream / evolution systems). bbuddy is a
-fork, not a rewrite; the base hatching/status/presence logic is
-unchanged.
+- **Upstream**:
+  [**fiorastudio/buddy**](https://github.com/fiorastudio/buddy) — the
+  original MCP companion project: 21 species, MCP server scaffolding,
+  statusline renderer, XP/dream/evolution systems. bbuddy is a fork,
+  not a rewrite; the base hatching/status/presence logic is unchanged.
+  MIT-compatible.
+- **Speech-bubble design**:
+  [**gokomong/claude-buddy**](https://github.com/gokomong/claude-buddy)
+  — the "keep your Claude Code buddy forever" project that pioneered
+  the ASCII speech-bubble box used in bbuddy's statusline
+  (`src/statusline-wrapper.ts`). Ported here in commit `26f01f6`.
 
-What bbuddy adds on top:
+### What bbuddy adds
+
 - **Creator system** — 4-mode wizard (species / parts / AI delegate /
   manual ASCII), 6 personality presets, 100-pt stat distribution,
-  `custom_sprites` table
+  `custom_sprites` table.
 - **Slots** — `bbuddy_save / list / summon / dismiss`, automatic
-  `__previous` backup on swap
-- **i18n** — English default with Korean opt-in (`bbuddy_language`)
-- **Tool-driven creation wizard** — framed `.______.` card rendered
-  by the MCP tool itself (no LLM-scripted conversation)
-- **Statusline hardening** — stable anchor across reaction state,
-  terminal-width auto-detect (tmux / WezTerm / kitty / stty), CJK
-  visual-width math, zero HUD-plugin dependencies
+  `__previous` backup on swap.
+- **i18n** — English default with Korean opt-in via `bbuddy_language`.
+- **Tool-driven creation wizard** — framed `.______.` card rendered by
+  the MCP tool itself; the skill markdown just relays verbatim, no
+  LLM-scripted conversation.
+- **Statusline hardening** — stable anchor across reaction states,
+  terminal-width auto-detection (tmux, WezTerm, kitty, `stty`), CJK
+  visual-width math, zero HUD-plugin dependencies.
 - **Codex CLI extension** — Codex-specific hooks with ANSI sprite
-  rendering via stdout
-
-Licensed MIT — compatible with upstream. See [LICENSE](./LICENSE).
+  rendering via stdout (Codex has no statusline API).
+- **Packaging** — marketplace-ready `.mcp.json` manifests with
+  `${CLAUDE_PLUGIN_ROOT}` / `${CODEX_PLUGIN_ROOT}`; legacy-DB
+  auto-migration from `~/.bbddy/` and `~/.buddy/`.
 
 ---
 
-## 라이선스
+## License
 
-MIT
+MIT — see [LICENSE](./LICENSE).
