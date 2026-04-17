@@ -1,14 +1,25 @@
 {
   "name": "bbuddy",
   "displayName": "bbuddy — Create Your Companion",
-  "description": "직접 만드는 코딩 컴패니언 — AI ASCII 생성, 파츠 조합, 수동 스탯 분배",
+  "description": "Create and grow your own coding companion — AI ASCII generation, parts assembly, custom stats",
   "version": "0.1.0",
   "author": {
     "name": "gokomong",
     "url": "https://github.com/gokomong"
   },
   "skills": "skills",
-  "hooks": "hooks",
+  "hooks": {
+    "SessionStart": "hooks/session-start.mjs",
+    "Stop": "hooks/stop.mjs",
+    "PreToolUse": {
+      "matcher": "bash",
+      "handler": "hooks/pre-tool-use.mjs"
+    },
+    "PostToolUse": {
+      "matcher": "bash",
+      "handler": "hooks/post-tool-use.mjs"
+    }
+  },
   "mcp": {
     "serverName": "bbuddy"
   }
